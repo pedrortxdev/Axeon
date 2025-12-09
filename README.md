@@ -98,7 +98,6 @@ Aqui, **cada ciclo de CPU importa**.
 - Balanceamento de carga de baixíssima latência
 - VLANs, VXLANs e redes privadas por projeto
 - Firewall distribuído
-- Proteção Anti-DDoS integrada (Enterprise)
 
 ---
 
