@@ -1,234 +1,280 @@
-# ⚡ Axion Hypervisor
-### HPC-First Virtualization Platform
+# ⚡ Axion Control Plane
 
-> **Axion** é uma plataforma de virtualização focada em **performance extrema, computação de alto desempenho (HPC)** e workloads críticos.  
-Enquanto outras soluções nascem generalistas, o Axion nasce **bruto, rápido e agressivo**.
+### HPC-First LXC Orchestration Platform
+
+> **Axion** é uma plataforma de orquestração e virtualização focada em **performance extrema, alta densidade de containers e controle total do host**.
+> Ele nasce com uma filosofia clara: **menos abstração, mais performance real**.
+
+Diferente de soluções genéricas, o Axion é projetado para:
+
+* Máxima eficiência por core
+* Overhead praticamente zero
+* Telemetria em tempo real
+* Governança rígida de recursos
+* Arquitetura assíncrona enterprise-grade
 
 ---
 
 ## 🚀 Visão do Projeto
 
-O Axion foi criado com um objetivo claro:
+O Axion foi criado com um objetivo direto:
 
-> **Extrair o máximo absoluto de performance do hardware disponível.**
+> **Extrair o máximo absoluto de performance do hardware disponível usando LXC.**
 
 Ele é ideal para:
-- Clusters de HPC
-- Computação científica
-- Renderização massiva
-- Machine Learning
-- IA distribuída
-- Simulações físicas
-- Game servers de altíssima densidade
-- Datacenters privados de alto desempenho
 
-Nada de sobrecarga desnecessária.  
-Nada de serviços inúteis rodando em segundo plano.  
+* Game servers de alta densidade
+* Ambientes de staging e produção
+* Infraestrutura para SaaS
+* Plataformas de CI/CD
+* Laboratórios de desenvolvimento
+* Ambientes educacionais
+* Clusters de containers de alta performance
+
+Nada de hipervisores pesados.
+Nada de overengineering desnecessário.
 Aqui, **cada ciclo de CPU importa**.
 
 ---
 
 ## 🧠 Filosofia do Axion
 
-- **Performance acima de tudo**
-- **Latência mínima**
-- **Arquitetura enxuta**
-- **Controle total do host**
-- **Escalabilidade horizontal real**
-- **Automação nativa**
-- **Nada de vendor lock-in**
+* **Performance acima de tudo**
+* **Latência mínima**
+* **Arquitetura enxuta**
+* **Controle total do host**
+* **Alta densidade por nó**
+* **Automação nativa**
+* **Sem vendor lock-in**
 
 ---
 
-## 🏗️ Arquitetura (Planejada)
+## ✅ Escopo Atual (v1.x)
 
-- Hypervisor baseado em:
-  - **KVM otimizado**
-  - **QEMU customizado**
-- Gerenciamento por:
-  - Painel Web em **Next.js + Rust Backend**
-  - API REST e gRPC
-- Armazenamento:
-  - ZFS otimizado para NVMe
-  - Ceph opcional para clusters
-  - Suporte nativo a storage local ultra-performático
-- Rede:
-  - SR-IOV
-  - DPDK
-  - RDMA / InfiniBand
-  - vSwitch próprio focado em baixa latência
+Atualmente, o Axion é um **Control Plane completo para Containers LXC**, utilizando o LXD como runtime base.
 
----
+### 🔹 O que o Axion é HOJE:
 
-## 🖥️ O que o Axion Vai Ter (Ideias para Implementação)
+* Orquestrador LXC
+* Painel Web em tempo real
+* Job System assíncrono
+* Governança global de recursos
+* Autenticação por JWT
+* Auditoria de ações
+* Controle completo do ciclo de vida dos containers
 
-### ⚙️ Núcleo do Sistema
-- Kernel Linux customizado para:
-  - Baixa latência
-  - Scheduler voltado para HPC
-  - Huge Pages por padrão
-- Boot ultra-rápido
-- Host minimalista (apenas o essencial)
+### 🔹 O que o Axion NÃO é ainda:
+
+* ❌ Orquestrador multi-node
+* ❌ Hypervisor de VMs (KVM)
+* ❌ Plataforma bare-metal
+* ❌ Orquestrador de GPU
+
+Esses pontos fazem parte da **v2.0+**.
 
 ---
 
-### 📦 Virtualização e Containers
-- VMs tradicionais (KVM)
-- Containers nativos
-- MicroVMs para execução ultrarrápida
-- Isolamento agressivo de CPU, RAM e I/O
-- GPU Passthrough com foco em CUDA, ROCm e OpenCL
+## 🏗️ Arquitetura Atual (Implementada)
+
+### 🔧 Backend (Control Plane)
+
+* **Linguagem:** Go 1.22+
+* **Framework HTTP:** Gin
+* **Persistência:** SQLite (WAL Mode)
+* **Autenticação:** JWT (24h)
+* **Arquitetura:** Totalmente assíncrona via Jobs
+* **Worker Pool:** 2 workers concorrentes
+* **WebSocket:** Telemetria + Eventos de Jobs
+* **Governança:** Quota global de CPU e RAM
+* **Resiliência:**
+
+  * Locks por container
+  * Retry com backoff exponencial
+  * Timeout por tipo de job
+  * Recovery de jobs presos
 
 ---
 
-### 🧮 Recursos de HPC
-- Gerenciamento nativo de:
-  - Nós de computação
-  - Filas de execução
-  - Alocação dinâmica de recursos
-- Integração com:
-  - Slurm
-  - OpenMPI
-  - Kubernetes para workloads híbridos
-- Execução de jobs distribuídos diretamente pelo painel
+### 📦 Runtime de Containers
+
+* **Tecnologia:** LXC/LXD
+* **Conexão:** Socket Unix direto
+* **Operações:**
+
+  * Create
+  * Start
+  * Stop
+  * Restart
+  * Update CPU/RAM
+* **Telemetria:** CPU e RAM em tempo real (1s)
+
+⚠️ Todos os containers **compartilham o kernel do host**, garantindo:
+
+* Overhead mínimo
+* Boot instantâneo
+* Performance próxima ao bare-metal
 
 ---
 
-### 🌐 Rede e Comunicação
-- Balanceamento de carga de baixíssima latência
-- VLANs, VXLANs e redes privadas por projeto
-- Firewall distribuído
+### 🌐 Comunicação em Tempo Real
+
+* WebSocket multiplexado:
+
+  * Telemetria de containers
+  * Eventos de Jobs (PENDING → IN_PROGRESS → COMPLETED/FAILED)
+* Event Bus interno com fan-out
 
 ---
 
-### 💾 Armazenamento
-- ZFS com tuning automático
-- Snapshots instantâneos
-- Replicação de dados entre nós
-- Storage definido por software (SDS)
-- NVMe over Fabrics
+## 🖥️ Frontend (Painel Web)
+
+* **Framework:** Next.js 14+ (App Router)
+* **Design:** Enterprise Dark (Zinc + Indigo)
+* **Features:**
+
+  * Login com JWT
+  * Dashboard com cards em tempo real
+  * Gráficos sparkline de CPU/RAM
+  * Controle Start/Stop/Restart
+  * Wizard de criação de instâncias
+  * Settings Panel para CPU/RAM
+  * Activity Drawer com auditoria de Jobs
+* **Segurança:**
+
+  * Proteção de rotas
+  * Redirecionamento automático para /login
+  * Logout forçado ao receber 401
 
 ---
 
-### 📊 Monitoramento e Telemetria
-- Monitoramento em tempo real de:
-  - CPU, RAM, I/O, Latência
-  - Temperatura
-  - Consumo elétrico estimado
-- Alertas inteligentes
-- IA para previsão de falhas (Enterprise)
+## 🛡️ Segurança
+
+* Autenticação JWT
+* Middleware para rotas e WebSocket
+* Auditoria de Jobs
+* Locks de execução por container
+* Quota global de recursos
+* Prevenção contra overcommit
 
 ---
 
-### 🤖 Automação
-- Provisionamento automático de VMs
-- Auto-Scaling de workloads
-- Clusters auto-curáveis
-- Templates de sistemas otimizados para HPC, ML, Games, Render, etc.
+## 📊 Governança de Recursos
 
----
+* **Limite Global Atual:**
 
-## 🔐 Segurança
+  * 8 vCPU
+  * 8 GB RAM
+* Validação antes de:
 
-- Isolamento total entre tenants
-- Criptografia nativa em discos e snapshots
-- Secure Boot
-- Auditoria de acessos
-- Controle de identidade (IAM)
+  * Criar containers
+  * Atualizar limites
+* Retorno semântico:
+
+  * `409 Conflict` ao exceder capacidade
+
+Isso impede que usuários:
+
+* Travam o host
+* Criem instâncias infinitas
+* Inflacionem recursos sem controle
 
 ---
 
 ## 📦 Planos do Axion
 
-### 🧪 Axion Personal (Projetos Pessoais)
-- Uso individual e educacional
-- 1 cluster
-- Limite de nós
-- Sem SLA
-- Atualizações básicas
-- Comunidade
+### 🧪 Axion Personal
+
+* Projetos pessoais
+* Estudos
+* Ambientes locais
+* Sem SLA
+* Comunidade
 
 ---
 
-### 🏢 Axion Enterprise (HPC Profissional)
-- Uso comercial ilimitado
-- Suporte 24/7
-- SLA garantido
-- Anti-DDoS integrado
-- IA de otimização de carga
-- Backup corporativo
-- Multi-datacenter
-- Integração com infraestrutura legada
-- Compliance (ISO, LGPD, etc.)
+### 🏢 Axion Enterprise
+
+* Uso comercial
+* Suporte 24/7
+* SLA garantido
+* Auditoria avançada
+* Backup corporativo
+* Multi-ambiente
+* Compliance (LGPD, ISO, etc.)
 
 ---
 
-## 🧬 Roadmap (Totalmente Inicial)
+## 🧬 Roadmap
 
-- [ ] Kernel customizado
-- [ ] Orquestrador de clusters
-- [ ] Painel Web
-- [ ] API pública
-- [ ] Sistema de templates de VMs
-- [ ] Gerenciamento de GPU
-- [ ] Sistema de filas de jobs HPC
-- [ ] Rede de baixa latência
-- [ ] Monitoramento avançado
-- [ ] Sistema de snapshots distribuídos
+### ✅ v1.x (Atual)
+
+* [x] Control Plane LXC
+* [x] Painel Web
+* [x] Telemetria em tempo real
+* [x] Job System assíncrono
+* [x] Governança de recursos
+* [x] Autenticação JWT
+* [x] Wizard de criação de instâncias
 
 ---
 
-## 🛠️ Tecnologias Planejadas
+### 🚀 v2.0 (Futuro)
 
-- Rust (backend)
-- Next.js (painel)
-- C/C++ (núcleo de virtualização)
-- Go (orquestração)
-- Linux custom
-- ZFS
-- KVM
-- QEMU
-- DPDK
-- Ceph
-- Slurm
-- Kubernetes
+* [ ] Multi-node Control Plane
+* [ ] dqlite ou etcd
+* [ ] Suporte a VMs via LXD (KVM)
+* [ ] Scheduler distribuído
+* [ ] Quotas por usuário
+* [ ] Orquestração de clusters
+
+---
+
+## 🛠️ Tecnologias
+
+### ✅ Atuais
+
+* Go
+* Gin
+* LXD / LXC
+* SQLite (WAL)
+* Next.js
+* WebSocket
+* JWT
+
+### 🔮 Futuras
+
+* KVM
+* dqlite / etcd
+* ZFS
+* Ceph
+* Kubernetes
+* Slurm
 
 ---
 
 ## 📜 Licenciamento
 
-O **Axion não é open-source completo**.  
-Ele opera sob um modelo:
+O **Axion não é open-source completo**.
 
-- Código fechado
-- Licenciamento por:
-  - Projeto
-  - Datacenter
-  - Cluster
+Modelo de licença:
 
-Alguns módulos poderão ser open-source futuramente.
+* Uso pessoal
+* Uso educacional
+* Uso comercial
+* Por cluster ou infraestrutura
+
+Alguns módulos poderão ser abertos futuramente.
 
 ---
 
 ## ⚠️ Status Atual
 
-> 🚧 **Projeto em fase conceitual (tudo no papel).**  
-Nenhuma linha de código foi escrita até o momento.  
-A arquitetura está sendo planejada para já nascer escalável, robusta e extrema.
+> ✅ **Projeto ativo e funcional em produção local.**
+> O Axion **já possui backend, frontend, job system, segurança, telemetria e governança de recursos implementados.**
 
 ---
 
-## 🧠 Frase Oficial do Projeto
+## 🧠 Frase Oficial
 
-> **“Axion não gerencia máquinas. Ele liberta o hardware.”**
-
----
-
-## 📩 Contato
-
-Em breve:  
-- Site oficial  
-- Documentação  
-- Comunidade  
-- Portal Enterprise  
+> **“Axion não gerencia máquinas. Ele extrai o máximo do hardware.”**
 
