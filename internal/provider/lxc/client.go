@@ -25,6 +25,7 @@ type InstanceService struct {
 type InstanceMetric struct {
 	Location         string                       `json:"location"`
 	Name             string                       `json:"name"`
+	Type             string                       `json:"type"`
 	Status           string                       `json:"status"`
 	MemoryUsageBytes int64                        `json:"memory_usage_bytes"`
 	CPUUsageSeconds  int64                        `json:"cpu_usage_seconds"`
@@ -209,7 +210,7 @@ func (s *InstanceService) CheckGlobalQuota(requestCPU int, requestRAMMB int64) e
 }
 
 func (s *InstanceService) ListInstances() ([]InstanceMetric, error) {
-	instances, err := s.server.GetInstancesFull(api.InstanceTypeContainer)
+	instances, err := s.server.GetInstancesFull(api.InstanceTypeAny)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao listar instâncias: %w", err)
 	}
@@ -232,6 +233,7 @@ func (s *InstanceService) ListInstances() ([]InstanceMetric, error) {
 		metrics = append(metrics, InstanceMetric{
 			Location:         inst.Location,
 			Name:             inst.Name,
+			Type:             inst.Type,
 			Status:           inst.Status,
 			MemoryUsageBytes: memBytes,
 			CPUUsageSeconds:  cpuSeconds,
@@ -332,66 +334,92 @@ func (s *InstanceService) UpdateInstanceLimits(name string, memoryLimit string, 
 
 // CreateInstance cria um novo container ou VM a partir de uma imagem LOCAL com suporte a Cloud-Init.
 func (s *InstanceService) CreateInstance(name string, imageAlias string, instanceType string, limits map[string]string, userData string) error {
-	// 1. Lock check...
-	if _, busy := s.locks.LoadOrStore(name, true); busy {
-		return fmt.Errorf("LOCKED: %s está ocupado", name)
-	}
-	defer s.locks.Delete(name)
+    // 1. Lock check
+    if _, busy := s.locks.LoadOrStore(name, true); busy {
+        return fmt.Errorf("LOCKED: %s está ocupado", name)
+    }
+    defer s.locks.Delete(name)
 
-	// 2. Ajuste de Alias da Imagem (Lógica Inteligente)
-	// Se for VM e o alias não terminar em "-vm", adicione "-vm" para achar a imagem correta.
-	finalAlias := imageAlias
-	if instanceType == "virtual-machine" && !strings.HasSuffix(imageAlias, "-vm") {
-		finalAlias = imageAlias + "-vm"
-	}
+    // 2. Ajuste de Alias (VM vs Container)
+    finalAlias := imageAlias
+    if instanceType == "virtual-machine" && !strings.HasSuffix(imageAlias, "-vm") {
+        finalAlias = imageAlias + "-vm"
+    }
 
-	// 3. Configuração
-	config := make(map[string]string)
-	for k, v := range limits {
-		config[k] = v
-	}
+    // Validação: Verificar se a imagem existe ANTES de tentar
+    _, _, err := s.server.GetImageAlias(finalAlias)
+    if err != nil {
+        return fmt.Errorf("IMAGEM NÃO ENCONTRADA: O alias '%s' não existe no LXD. Rode o script de preload.", finalAlias)
+    }
 
-	// Configs específicas de VM
-	if instanceType == "virtual-machine" {
-		config["security.secureboot"] = "false"
-		config["agent.enabled"] = "true" // Vital para o File Manager funcionar
-	}
+    // 3. Configuração
+    config := make(map[string]string)
+    for k, v := range limits {
+        config[k] = v
+    }
 
-	// Injeção Cloud-Init
-	if userData != "" {
-		config["user.user-data"] = userData
-		config["cloud-init.network-config"] = "version: 2\nethernets:\n  eth0:\n    dhcp4: true" // Garante rede
-	}
+    if instanceType == "virtual-machine" {
+        config["security.secureboot"] = "false"
+        // config["agent.enabled"] = "true" // REMOVIDO: Causa erro em LXD recente
+    }
 
-	// 4. Source (Sempre Local, pois já fizemos preload)
-	req := api.InstancesPost{
-		Name: name,
-		Type: api.InstanceType(instanceType),
-		Source: api.InstanceSource{
-			Type:  "image",
-			Alias: finalAlias, // Usa o alias corrigido
-		},
-		InstancePut: api.InstancePut{
-			Config:   config,
-			Profiles: []string{"default"},
-		},
-	}
+    if userData != "" {
+        config["user.user-data"] = userData
+    }
 
-	// 5. Execução
-	log.Printf("[Create] Criando %s (%s) usando imagem '%s'...", name, instanceType, finalAlias)
-	op, err := s.server.CreateInstance(req)
-	if err != nil {
-		return fmt.Errorf("erro no LXD Create: %w", err)
-	}
-	if err := op.Wait(); err != nil {
-		return fmt.Errorf("erro ao aguardar criação: %w", err)
-	}
+    req := api.InstancesPost{
+        Name: name,
+        Type: api.InstanceType(instanceType), // Vital para VM
+        Source: api.InstanceSource{
+            Type:  "image",
+            Alias: finalAlias,
+        },
+        InstancePut: api.InstancePut{
+            Config:   config,
+            Profiles: []string{"default"},
+        },
+    }
 
-	// 6. Auto-Start (Opcional, mas Cloud-Init só roda no boot)
-	// Por enquanto, retorne sucesso.
-	return nil
-}
+    log.Printf("[Create] Iniciando criação de %s (%s) com imagem '%s'...", name, instanceType, finalAlias)
 
+    // 4. Execução Assíncrona
+    op, err := s.server.CreateInstance(req)
+    if err != nil {
+        return fmt.Errorf("LXD recusou a request: %w", err)
+    }
+
+    // 5. Esperar a Operação (Aqui que a VM demora 10s+)
+    log.Printf("[Create] Aguardando operação do LXD...")
+    if err := op.Wait(); err != nil {
+        return fmt.Errorf("LXD falhou durante a criação: %w", err)
+    }
+
+    	// 6. O TIRA-TEIMA (Double Check)
+    	// Verifica se a instância realmente existe no banco do LXD
+    	_, _, err = s.server.GetInstance(name)
+    	if err != nil {
+    		return fmt.Errorf("ERRO FANTASMA: LXD disse sucesso, mas a instância '%s' não foi encontrada: %w", name, err)
+    	}
+    
+    	// 7. Auto-Start: Iniciar a instância imediatamente
+    	log.Printf("[Create] Iniciando boot de %s...", name)
+    	reqState := api.InstanceStatePut{
+    		Action:  "start",
+    		Timeout: -1,
+    	}
+    
+    	opStart, err := s.server.UpdateInstanceState(name, reqState, "")
+    	if err != nil {
+    		return fmt.Errorf("falha ao solicitar start pós-criação: %w", err)
+    	}
+    
+    	if err := opStart.Wait(); err != nil {
+    		return fmt.Errorf("falha ao iniciar instância: %w", err)
+    	}
+    
+    	log.Printf("[Create] Sucesso confirmado para %s", name)
+    	return nil
+    }
 func (s *InstanceService) DeleteInstance(name string) error {
 	if _, busy := s.locks.LoadOrStore(name, true); busy {
 		return fmt.Errorf("LOCKED: container '%s' já está sendo operado", name)
@@ -779,13 +807,15 @@ func (s *InstanceService) ListNetworks() ([]api.Network, error) {
 // CreateNetwork creates a new bridge network
 func (s *InstanceService) CreateNetwork(name string, description string, ipv4Subnet string) error {
 	req := api.NetworksPost{
-		Name:        name,
-		Type:        "bridge",
-		Description: description,
-		Config: map[string]string{
-			"ipv4.address": ipv4Subnet,
-			"ipv4.nat":     "true",
-			"ipv6.address": "none",
+		Name: name,
+		Type: "bridge",
+		NetworkPut: api.NetworkPut{
+			Description: description,
+			Config: map[string]string{
+				"ipv4.address": ipv4Subnet,
+				"ipv4.nat":     "true",
+				"ipv6.address": "none",
+			},
 		},
 	}
 

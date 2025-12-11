@@ -8,20 +8,21 @@ interface CreateInstanceModalProps {
   isOpen: boolean;
   onClose: () => void;
   token: string | null;
+  initialType?: 'container' | 'virtual-machine';
 }
 
-// Validated Cloud-Init Templates with correct indentation
+// Validated Cloud-Init Templates
 const TEMPLATES = [
   {
     id: 'none',
     label: 'Clean OS',
-    description: 'Vazio',
+    description: 'Empty configuration',
     yaml: '',
   },
   {
     id: 'docker',
     label: 'Docker Host',
-    description: 'Instalação de Docker e Docker Compose',
+    description: 'Pre-installed Docker & Compose',
     yaml: `
 packages:
   - docker.io
@@ -33,7 +34,7 @@ runcmd:
   {
     id: 'web',
     label: 'Web Server',
-    description: 'Nginx com página inicial',
+    description: 'Nginx with default page',
     yaml: `
 packages:
   - nginx
@@ -46,17 +47,23 @@ write_files:
   },
 ];
 
-const IMAGES = [
+const CONTAINER_IMAGES = [
   { value: 'ubuntu/24.04', label: 'Ubuntu 24.04 LTS' },
   { value: 'ubuntu/22.04', label: 'Ubuntu 22.04 LTS' },
+  { value: 'alpine/3.19', label: 'Alpine 3.19' },
 ];
 
-export default function CreateInstanceModal({ isOpen, onClose, token }: CreateInstanceModalProps) {
-  const [type, setType] = useState<'container' | 'virtual-machine'>('container');
+const VM_IMAGES = [
+  { value: 'ubuntu/24.04', label: 'Ubuntu 24.04 LTS (VM)' },
+  { value: 'debian/12', label: 'Debian 12 (VM)' },
+];
+
+export default function CreateInstanceModal({ isOpen, onClose, token, initialType = 'container' }: CreateInstanceModalProps) {
+  const [type, setType] = useState<'container' | 'virtual-machine'>(initialType);
   const [name, setName] = useState('');
-  const [image, setImage] = useState('ubuntu/24.04');
+  const [image, setImage] = useState(initialType === 'container' ? CONTAINER_IMAGES[0].value : VM_IMAGES[0].value);
   const [cpu, setCpu] = useState(1);
-  const [memory, setMemory] = useState(256);
+  const [memory, setMemory] = useState(512);
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [templateId, setTemplateId] = useState('none');
@@ -64,20 +71,34 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Update user data when template changes
+  // Update defaults when initialType changes or modal opens
   useEffect(() => {
-    // Generate the combined YAML based on current inputs
+    if (isOpen) {
+        setType(initialType);
+        setImage(initialType === 'container' ? CONTAINER_IMAGES[0].value : VM_IMAGES[0].value);
+        // Reset fields
+        setName('');
+        setCpu(1);
+        setMemory(initialType === 'container' ? 256 : 1024); // VMs need more RAM usually
+        setUsername('admin');
+        setPassword('');
+        setTemplateId('none');
+        setUserData('');
+        setShowAdvanced(false);
+    }
+  }, [isOpen, initialType]);
+
+  // Update user data when relevant fields change
+  useEffect(() => {
     generateUserData();
   }, [type, templateId, username, password]);
 
   const generateUserData = () => {
     const templateYaml = TEMPLATES.find(t => t.id === templateId)?.yaml || '';
-
-    // Build the complete user data YAML
     let yamlLines = ['#cloud-config'];
 
-    // 1. User Configuration
-    if (username && password) {
+    // 1. User Configuration (VM Only)
+    if (type === 'virtual-machine' && username && password) {
       yamlLines.push('');
       yamlLines.push('users:');
       yamlLines.push(`  - name: ${username}`);
@@ -86,7 +107,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
       yamlLines.push('    lock_passwd: false');
       yamlLines.push('    shell: /bin/bash');
 
-      // Workaround to force password
+      // Force password set
       yamlLines.push('');
       yamlLines.push('chpasswd:');
       yamlLines.push('  list: |');
@@ -94,13 +115,13 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
       yamlLines.push('  expire: False');
     }
 
-    // 2. Package updates and critical packages for VMs
+    // 2. Package updates
     yamlLines.push('');
     yamlLines.push('package_update: true');
     yamlLines.push('packages:');
 
     if (type === 'virtual-machine') {
-      yamlLines.push('  - qemu-guest-agent'); // CRITICAL for VMs to report IP/RAM
+      yamlLines.push('  - qemu-guest-agent'); 
     }
 
     // Add packages from template
@@ -109,19 +130,18 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
     for (const line of templateLines) {
       if (line.trim() === 'packages:') {
         inPackagesSection = true;
-        continue; // We'll add template packages after VM packages
+        continue;
       }
 
       if (inPackagesSection && line.trim().startsWith('  - ')) {
         yamlLines.push(line);
       } else if (inPackagesSection && !line.trim().startsWith('  - ') && line.trim() !== '') {
-        // End of packages section, process other parts of template
         inPackagesSection = false;
         break;
       }
     }
 
-    // Add remaining template content (runcmd, write_files, etc.)
+    // Add remaining template content
     let processingRest = false;
     for (const line of templateLines) {
       if (line.trim() === 'packages:') {
@@ -147,14 +167,16 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
       return;
     }
 
-    if (!username.trim()) {
-      toast.error('Invalid Username', { description: 'Username cannot be empty.' });
-      return;
-    }
-
-    if (!password.trim()) {
-      toast.error('Invalid Password', { description: 'Password cannot be empty.' });
-      return;
+    // Specific validation for VM
+    if (type === 'virtual-machine') {
+        if (!username.trim()) {
+            toast.error('Invalid Username', { description: 'Username is required for VMs.' });
+            return;
+        }
+        if (!password.trim()) {
+            toast.error('Invalid Password', { description: 'Password is required for VMs.' });
+            return;
+        }
     }
 
     setIsLoading(true);
@@ -166,9 +188,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
       const payload = {
         name: name.trim(),
         type: type,
-        source: {
-          alias: image
-        },
+        image: image,
         limits: {
           "limits.cpu": cpu.toString(),
           "limits.memory": `${memory}MB`
@@ -188,15 +208,6 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
       if (response.ok) {
         toast.success('Provisioning Started', { description: `Creating ${name} as ${type}...` });
         onClose();
-        // Reset form
-        setName('');
-        setMemory(256);
-        setCpu(1);
-        setUsername('admin');
-        setPassword('');
-        setTemplateId('none');
-        setUserData('');
-        setShowAdvanced(false);
       } else {
         const error = await response.json();
         toast.error('Creation Failed', { description: error.error || 'Unknown error' });
@@ -207,6 +218,8 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
       setIsLoading(false);
     }
   };
+
+  const imagesList = type === 'container' ? CONTAINER_IMAGES : VM_IMAGES;
 
   return (
     <>
@@ -222,10 +235,12 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
           <div className="flex items-center justify-between p-6 border-b border-zinc-900 flex-shrink-0">
             <div>
               <h2 className="text-xl font-semibold text-zinc-100 flex items-center gap-2">
-                <Box className="text-indigo-500" size={20} />
-                New Instance
+                {type === 'container' ? <Box className="text-indigo-500" size={20} /> : <Monitor className="text-purple-500" size={20} />}
+                New {type === 'container' ? 'Container' : 'Virtual Machine'}
               </h2>
-              <p className="text-sm text-zinc-500 mt-1">Configure your instance with the wizard below.</p>
+              <p className="text-sm text-zinc-500 mt-1">
+                {type === 'container' ? 'Lightweight, system container.' : 'Full virtual machine with dedicated kernel.'}
+              </p>
             </div>
             <button
               onClick={onClose}
@@ -237,49 +252,6 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-8">
-
-            {/* Instance Type Tabs */}
-            <div>
-              <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2 mb-3">
-                <Box size={16} className="text-zinc-500" /> Instance Type
-              </h3>
-
-              <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-lg p-1">
-                <button
-                  type="button"
-                  onClick={() => setType('container')}
-                  className={`
-                    flex-1 py-3 px-4 rounded-md text-sm font-medium transition-all
-                    ${type === 'container'
-                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                    }
-                  `}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Box size={16} className={type === 'container' ? 'text-indigo-400' : 'text-zinc-500'} />
-                    Container
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setType('virtual-machine')}
-                  className={`
-                    flex-1 py-3 px-4 rounded-md text-sm font-medium transition-all
-                    ${type === 'virtual-machine'
-                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                    }
-                  `}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Monitor size={16} className={type === 'virtual-machine' ? 'text-indigo-400' : 'text-zinc-500'} />
-                    Virtual Machine
-                  </div>
-                </button>
-              </div>
-            </div>
 
             {/* Basic Configuration */}
             <div className="space-y-4">
@@ -294,21 +266,21 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. app-server-01"
+                    placeholder={type === 'container' ? "my-container-01" : "my-vm-01"}
                     className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600"
                     autoFocus
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">OS Image</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Image</label>
                   <div className="relative">
                     <select
                       value={image}
                       onChange={(e) => setImage(e.target.value)}
                       className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all cursor-pointer"
                     >
-                      {IMAGES.map(img => (
+                      {imagesList.map(img => (
                         <option key={img.value} value={img.value}>{img.label}</option>
                       ))}
                     </select>
@@ -363,46 +335,53 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
               </div>
             </div>
 
-            {/* Access Configuration */}
+            {/* Access Configuration (Conditional) */}
             <div className="space-y-4">
               <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                <User size={16} className="text-zinc-500" /> Access
+                <User size={16} className="text-zinc-500" /> Access & Network
               </h3>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Username</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="admin"
-                        className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
-                      />
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
-                        <User size={16} />
+                {type === 'virtual-machine' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Username</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="admin"
+                            className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
+                          />
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                            <User size={16} />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Password</label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
-                      />
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
-                        <Key size={16} />
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Password</label>
+                        <div className="relative">
+                          <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
+                          />
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                            <Key size={16} />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                ) : (
+                    <div className="p-3 bg-zinc-900/30 border border-zinc-800 rounded-lg flex items-center gap-3">
+                        <User size={16} className="text-zinc-500" />
+                        <span className="text-sm text-zinc-400">Authentication is disabled for Containers (System Container).</span>
+                    </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Network</label>
@@ -475,9 +454,6 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
                       {userData || <span className="text-zinc-600 italic">Select a template or enable editor to view YAML</span>}
                     </div>
                   )}
-                  <p className="text-[10px] text-zinc-600 mt-1">
-                    This YAML will be used for Cloud-Init configuration.
-                  </p>
                 </div>
               </div>
             </div>
@@ -497,7 +473,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token }: CreateIn
               type="submit"
               onClick={handleSubmit}
               disabled={isLoading}
-              className="px-6 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`px-6 py-2 text-sm font-medium text-white rounded-lg shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${type === 'container' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20' : 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20'}`}
             >
               {isLoading && <Loader2 size={16} className="animate-spin" />}
               {isLoading ? 'Provisioning...' : 'Create Instance'}

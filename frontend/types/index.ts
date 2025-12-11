@@ -46,6 +46,7 @@ export interface InstanceDevices {
 export interface InstanceMetric {
   location?: string;
   name: string;
+  type?: string;
   status: string;
   memory_usage_bytes: number;
   cpu_usage_seconds: number;

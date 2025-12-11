@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
@@ -10,19 +10,18 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const token = localStorage.getItem('axion_token');
     if (!token) {
       router.push('/login');
     }
   }, [router]);
 
-  // If not authenticated, we don't render anything (redirect will happen)
-  // This is a simple approach; you might want to show a loading state instead
-  const token = localStorage.getItem('axion_token');
-  if (!token) {
-    return null;
+  if (!isMounted) {
+    return null; 
   }
 
   return (

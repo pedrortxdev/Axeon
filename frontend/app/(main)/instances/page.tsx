@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
-import { Server, Cpu, Zap, Play, Square, RefreshCw, Loader2, Settings, Save, HardDrive, Network, FolderOpen, MoreVertical, X, SquareTerminal, Trash2 } from 'lucide-react';
+import { Server, Cpu, Zap, Play, Square, RefreshCw, Loader2, Settings, Save, HardDrive, Network, FolderOpen, MoreVertical, X, SquareTerminal, Trash2, Box, Monitor, Search } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { useRouter } from 'next/navigation';
 import ActivityDrawer from '@/components/ActivityDrawer';
@@ -72,12 +72,16 @@ export default function InstancesPage() {
   // UI State
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalType, setCreateModalType] = useState<'container' | 'virtual-machine'>('container');
   const [snapshotInstance, setSnapshotInstance] = useState<string | null>(null);
   const [networkInstance, setNetworkInstance] = useState<string | null>(null);
   const [fileInstance, setFileInstance] = useState<string | null>(null);
   const [terminalInstance, setTerminalInstance] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState<Record<string, boolean>>({});
   const [resourceInputs, setResourceInputs] = useState<Record<string, ResourceState>>({});
+  
+  // Filter State
+  const [filterType, setFilterType] = useState<'all' | 'container' | 'virtual-machine'>('all');
 
   // Menu State
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -152,6 +156,8 @@ export default function InstancesPage() {
     ws.onmessage = (event) => {
       try {
         const rawData = JSON.parse(event.data);
+        if (!rawData) return;
+
         if (Array.isArray(rawData)) {
             handleTelemetry(rawData);
             return;
@@ -208,8 +214,12 @@ export default function InstancesPage() {
             const isDragging = draggingRef.current[inst.name];
             const currentLocal = next[inst.name];
             if (!isDragging && (!currentLocal || !currentLocal.isDirty)) {
-                const serverMem = parseMemoryString(inst.config["limits.memory"]);
-                const serverCpu = parseCpuString(inst.config["limits.cpu"]);
+                // Config might be null during provisioning
+                const memVal = inst.config?.["limits.memory"];
+                const cpuVal = inst.config?.["limits.cpu"];
+                
+                const serverMem = parseMemoryString(memVal);
+                const serverCpu = parseCpuString(cpuVal);
                 if (!currentLocal || currentLocal.memoryInput !== serverMem || currentLocal.cpuInput !== serverCpu) {
                     next[inst.name] = { memoryInput: serverMem, cpuInput: serverCpu, isDirty: false };
                     changed = true;
@@ -376,6 +386,12 @@ export default function InstancesPage() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [menuOpen]);
 
+  // --- Filtering Logic ---
+  const filteredMetrics = metrics.filter(inst => {
+    if (filterType === 'all') return true;
+    return inst.type === filterType;
+  });
+
   // --- Render ---
 
   if (!token) return null;
@@ -385,7 +401,7 @@ export default function InstancesPage() {
       <Toaster position="top-right" theme="dark" closeButton />
 
       <ActivityDrawer isOpen={isActivityOpen} onClose={() => setIsActivityOpen(false)} jobs={jobs || []} />
-      <CreateInstanceModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} token={token} />
+      <CreateInstanceModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} token={token} initialType={createModalType} />
       <SnapshotDrawer isOpen={!!snapshotInstance} onClose={() => setSnapshotInstance(null)} instanceName={snapshotInstance} />
       <NetworkDrawer isOpen={!!networkInstance} onClose={() => setNetworkInstance(null)} instance={metrics.find(m => m.name === networkInstance) || null} />
       <FileExplorerDrawer isOpen={!!fileInstance} onClose={() => setFileInstance(null)} instanceName={fileInstance} />
@@ -404,16 +420,54 @@ export default function InstancesPage() {
                   <span className="flex h-2 w-2 relative ml-1"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span></span>
               )}
             </button>
-            <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-sm font-medium shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.02]">
-              <Square size={16} strokeWidth={2} className="rotate-45" /><span>New Instance</span>
-            </button>
+            <div className="flex items-center gap-2">
+                <button onClick={() => { setCreateModalType('container'); setIsCreateModalOpen(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-sm font-medium shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.02]">
+                    <Box size={16} /><span>New Container</span>
+                </button>
+                <button onClick={() => { setCreateModalType('virtual-machine'); setIsCreateModalOpen(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-md text-sm font-medium shadow-lg shadow-purple-900/20 transition-all hover:scale-[1.02]">
+                    <Monitor size={16} /><span>New VM</span>
+                </button>
+            </div>
           </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center">
+            <div className="bg-zinc-900/50 p-1 rounded-lg inline-flex border border-zinc-800/50">
+                <button
+                    onClick={() => setFilterType('all')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${filterType === 'all' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30'}`}
+                >
+                    All
+                </button>
+                <button
+                    onClick={() => setFilterType('container')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${filterType === 'container' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30'}`}
+                >
+                    <Box size={14} /> Containers
+                </button>
+                <button
+                    onClick={() => setFilterType('virtual-machine')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${filterType === 'virtual-machine' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30'}`}
+                >
+                    <Monitor size={14} /> Virtual Machines
+                </button>
+            </div>
         </div>
       </header>
 
       {/* Grid */}
+      {filteredMetrics.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-zinc-500">
+              <div className="bg-zinc-900/50 p-4 rounded-full mb-4 ring-1 ring-zinc-800">
+                  <Search size={32} strokeWidth={1.5} className="text-zinc-600" />
+              </div>
+              <h3 className="text-lg font-medium text-zinc-300">No instances found</h3>
+              <p className="text-sm">There are no {filterType === 'all' ? 'instances' : filterType === 'container' ? 'containers' : 'virtual machines'} in this view.</p>
+          </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {metrics.map((inst) => {
+        {filteredMetrics.map((inst) => {
           const isRunning = inst.status.toLowerCase() === 'running';
           const histData = history[inst.name]?.data || [];
           const isBusy = isInstanceBusy(inst.name);
@@ -430,7 +484,7 @@ export default function InstancesPage() {
               <div className="flex justify-between items-start mb-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2.5 rounded-lg border ${isRunning ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-500'}`}>
-                    <Server size={18} strokeWidth={1.5} />
+                    {inst.type === 'virtual-machine' ? <Monitor size={18} strokeWidth={1.5} /> : <Box size={18} strokeWidth={1.5} />}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -558,6 +612,7 @@ export default function InstancesPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
