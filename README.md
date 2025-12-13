@@ -1,77 +1,157 @@
 # ⚡ Axion Control Plane
-### HPC-First Container & Virtualization Platform
 
-> **"Axion não gerencia máquinas. Ele domina o hardware."**
+<div align="center">
 
-O **Axion** é um control plane de containers e virtualização focado em **performance extrema, baixa latência e HPC (High Performance Computing)**. Ele nasce para ser rápido, visual, otimizado e agressivo, eliminando a gordura dos painéis tradicionais.
+  [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go)](https://golang.org/)
+  [![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+  [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-DB4B8B?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+  [![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+  [![LXD](https://img.shields.io/badge/LXD-Container%20Platform-326DE6?style=for-the-badge&logo=linuxcontainers)](https://linuxcontainers.org/lxd/)
 
-**Axion não é um fork de Proxmox.** É uma arquitetura moderna, assíncrona, orientada a eventos e desenhada para escalar.
+</div>
 
----
-
-## 🚀 Status do Projeto
-
-![Status](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-1.0_RC-blue)
-![Build](https://img.shields.io/badge/Build-Passing-brightgreen)
-
-✅ **Backend & Frontend Operacionais**
-✅ **Containers LXC & VMs KVM em Produção**
-✅ **Cluster Mode (TLS) Ativo**
-
-O Axion já é um Control Plane completo, oferecendo ciclo de vida total de instâncias, orquestração de rede e armazenamento, e ferramentas de operação "Day 2" (Terminal, Arquivos, Logs).
+> **"O Control Plane moderno e de alta performance para gerenciar Containers e VMs via LXD"**
+>
+> Uma alternativa leve e poderosa ao Proxmox, focada em Developer Experience (DX) e interface moderna.
 
 ---
 
-## 🧠 Filosofia
+## 📖 Introdução
 
-* **Performance First:** Cada milissegundo conta. Arquitetura feita para HPC.
-* **Zero Bloatware:** Sem agentes pesados. O Axion roda leve e deixa o hardware para o workload.
-* **Assíncrono & Real-Time:** Nada de "refresh na página". Tudo é atualizado via WebSockets multiplexados.
-* **No Vendor Lock-in:** Baseado em padrões abertos (LXC/LXD/KVM).
-* **Visual Enterprise:** Interface "Dark Mode" densa e informativa.
+O **Axion** é um Control Plane moderno e de alta performance projetado para gerenciar Containers LXC e Máquinas Virtuais (VMs) via LXD. Inspirado pelas melhores práticas de infraestrutura, o Axion oferece uma experiência de desenvolvedor excepcional com uma interface de usuário elegante e funcionalidades avançadas de monitoramento, backup e governança.
+
+Ao contrário de soluções tradicionais, o Axion foi construído do zero com foco em performance, simplicidade e escalabilidade, proporcionando uma plataforma ágil para ambientes de desenvolvimento, homelabs e até mesmo produções menores.
 
 ---
 
-## 🏗️ Stack Tecnológico
+## ✨ Funcionalidades
 
-### Backend (The Engine)
-* **Core:** Go (Golang) 1.25+
-* **API:** Gin Framework (High Performance HTTP)
-* **Database:** SQLite (WAL Mode) com auto-recovery para persistência de Jobs e Schedules.
-* **Orquestração:** LXD via Socket Unix (Local) ou TLS (Cluster).
-* **Async System:** Worker Pool com filas persistentes, retry exponencial e locks por instância para evitar race conditions.
+### 📊 Enterprise Observability
+- 📈 **Métricas Históricas**: Coleta de dados de CPU, RAM e disco com retenção configurável
+- 🎯 **Gráficos Interativos**: Visualizações em tempo real com opções de período (1h, 24h, 7d, 30d)
+- 🕒 **Timeline Completa**: Histórico detalhado de eventos e métricas passadas
 
-### Frontend (The Cockpit)
-* **Framework:** Next.js 16 (App Router)
-* **UI Library:** Tailwind CSS + Lucide Icons + Sonner.
-* **Features:** Sidebar Navigation, Monaco Editor integrado, Terminal xterm.js, Telemetria em tempo real (Recharts).
+### 💾 Backup & Disaster Recovery
+- ⏰ **Backups Automatizados**: Sistema completo com agendamento via Cron (@daily, @weekly, etc.)
+- 🔄 **Política de Retenção**: Configuração flexível para manter apenas os backups necessários (últimos 7 dias, 90 dias, etc.)
+- ♻️ **Rotação de Snapshots**: Limpeza automática de snapshots antigos para economizar espaço
+
+### 🔍 Audit Logs & Timeline
+- 👤 **Registro de Eventos**: Acompanhe quem iniciou, parou, criou ou excluiu instâncias
+- 📋 **Timeline Detalhada**: Visão cronológica de todas as ações críticas na infraestrutura
+- 🕵️ **Auditoria Completa**: Ferramentas para investigar mudanças e incidentes
+
+### 🔁 Auto-Discovery
+- 🔄 **Sincronização Inteligente**: Estado automaticamente sincronizado entre LXD e Banco de Dados
+- 🎯 **Detecção Automática**: Identificação de novos containers e VMs sem intervenção manual
+- ⚡ **Atualização em Tempo Real**: Mantém o dashboard sempre atualizado com o estado real
+
+### 💻 VM Support
+- ⚡ **Virtual Machines Full**: Suporte completo a VMs QEMU/KVM além de containers LXC
+- 🌐 **Rede Automática**: Configuração de interfaces de rede com IPs e DNS configurados automaticamente
+- ☁️ **Cloud-Init Integrado**: Provisionamento inicial de VMs com scripts de inicialização
+
+### 💻 Web Terminal
+- 🌐 **Acesso Direto**: Terminal completo via xterm.js integrado no navegador
+- ⌨️ **Experiência Nativa**: Funcionalidades completas de terminal dentro do dashboard
+- 🔐 **Seguro e Isolado**: Conexão segura via WebSocket com controle granular
+
+### 🚀 Outras Funcionalidades
+- 📦 **LXC Containers**: Suporte completo a containers leves e isolados
+- 🌐 **Gerenciamento de Rede**: Configuração de bridges, subnets e port forwarding
+- 💾 **Storage & Snapshots**: Sistema completo de snapshots e gerenciamento de volumes
+- 🔐 **Cluster Mode**: Conexão segura via TLS para múltiplos nós LXD
+- ⚙️ **Scheduler Integrado**: Agendamento de tarefas com expressões Cron e persistência
+- 📝 **File Explorer**: Gerenciador de arquivos integrado com upload/download
 
 ---
 
-## 🛠️ Instalação e Execução
+## 🏗️ Arquitetura
+
+```
+┌─────────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│   Frontend          │    │   Backend        │    │   Infraestrutura │
+│   (Next.js)         │◄──►│   (Go API)       │◄──►│   (LXD Socket)   │
+│                     │    │                  │    │                  │
+│ • React Components  │    │ • Gin Framework  │    │ • LXC Containers │
+│ • TailwindCSS UI    │    │ • WebSocket API  │    │ • KVM VMs        │
+│ • Charts (Recharts) │    │ • Auth/JWT       │    │ • Network        │
+└─────────────────────┘    └──────────────────┘    └──────────────────┘
+                                    │
+                            ┌──────────────────┐
+                            │   Database       │
+                            │   (PostgreSQL)   │
+                            │                  │
+                            │ • Time Series    │
+                            │ • Instance Data  │
+                            │ • Audit Logs     │
+                            └──────────────────┘
+```
+
+A arquitetura do Axion segue princípios de separação de responsabilidades, com um frontend moderno em Next.js se comunicando com uma API RESTful em Go, que por sua vez interage com o socket do LXD e gerencia o banco de dados PostgreSQL.
+
+---
+
+## 🚀 Primeiros Passos
 
 ### Pré-requisitos
-* **Linux** (Ubuntu 22.04/24.04 recomendado)
-* **Go 1.25+**
-* **Node.js 20+** e NPM
-* **LXD** instalado e inicializado (`lxd init`)
 
-### 1. Setup Inicial e Backend
+Antes de começar, certifique-se de ter os seguintes componentes instalados:
+
+- [Go](https://golang.org/doc/install) 1.25+
+- [Node.js](https://nodejs.org/) 20+ e NPM
+- [LXD](https://linuxcontainers.org/lxd/getting-started-cli/) instalado e inicializado
+- [PostgreSQL](https://www.postgresql.org/download/) em execução
+
+#### Instalação do LXD e Inicialização
 ```bash
-# 1. Prepare as imagens do LXC/LXD (Opcional, popula o cache local)
-chmod +x preload_full.sh
-./preload_full.sh
+# Instale o LXD (Ubuntu/Debian)
+sudo apt update
+sudo apt install lxd lxd-client
 
-# 2. Instale as dependências do Go
+# Inicialize o LXD (responda às perguntas conforme sua infraestrutura)
+sudo lxd init
+
+# Adicione seu usuário ao grupo lxd (opcional, mas recomendado)
+sudo usermod -a -G lxd $USER
+```
+
+#### Configuração do PostgreSQL
+```bash
+# Instale o PostgreSQL
+sudo apt install postgresql postgresql-contrib
+
+# Configure um banco de dados e usuário para o Axion
+sudo -u postgres psql
+CREATE DATABASE axion;
+CREATE USER axion_user WITH PASSWORD 'sua_senha_segura';
+GRANT ALL PRIVILEGES ON DATABASE axion TO axion_user;
+\q
+```
+
+### Instalação e Execução
+
+#### 1. Clone o Repositório
+```bash
+git clone https://github.com/seuusuario/axion.git
+cd axion
+```
+
+#### 2. Configurar e Executar o Backend
+```bash
+# 1. Instale as dependências do Go
 go mod tidy
+
+# 2. Configure as variáveis de ambiente (renomeie .env.example para .env)
+cp .env.example .env
+# Edite .env com suas configurações de banco de dados e LXD
 
 # 3. Inicie o Control Plane (Backend)
 go run main.go
 ```
-*O Backend iniciará na porta `8500`.*
+O Backend iniciará na porta padrão `8500`.
 
-### 2. Setup do Frontend
+#### 3. Configurar e Executar o Frontend
 Em um novo terminal:
 ```bash
 cd frontend
@@ -79,76 +159,69 @@ cd frontend
 # 1. Instale as dependências
 npm install
 
-# 2. Inicie o servidor de desenvolvimento
+# 2. Configure o .env (se necessário)
+cp .env.example .env
+# Configure a URL da API do backend
+
+# 3. Inicie o servidor de desenvolvimento
 npm run dev
 ```
-*O Dashboard estará acessível em `http://localhost:3000`.*
+O Dashboard estará acessível em `http://localhost:3000`.
 
----
-
-## ⚡ Funcionalidades (Implementadas)
-
-### 🖥️ Compute & Orquestração
-* **LXC & KVM:** Suporte nativo a Containers (`container`) e Virtual Machines (`virtual-machine`).
-* **Cloud-Init:** Injeção automática de `user-data` para configuração inicial de rede e pacotes.
-* **Resource Limits:** Controle rígido de vCPU e RAM por instância.
-* **Global Quotas:** Sistema de governança que impede over-provisioning do host (Limites globais hardcoded para segurança).
-* **Cluster Awareness:** Conexão segura via TLS para gerenciamento de múltiplos nós LXD.
-* **Host Telemetry:** Monitoramento em tempo real de CPU, RAM, Disco e Rede do servidor físico via WebSocket.
-
-### 💾 Storage & Arquivos
-* **Snapshots (Time Machine):** Criar, Restaurar e Deletar backups instantâneos das instâncias.
-* **Axion Explorer:** Gerenciador de arquivos completo (Listar, Upload, Download, Deletar).
-* **Integrated IDE:** Edição de arquivos de configuração com **Monaco Editor** direto no navegador.
-* **Streaming Upload/Download:** Transferência eficiente de arquivos grandes.
-
-### 🌐 Rede & Conectividade
-* **Port Forwarding:** Criação de Proxy Devices para mapear portas do Host (10000-60000) para Containers/VMs (TCP/UDP).
-* **Network Manager:** Gestão completa de Bridges e Subnets.
-* **Boot Logs:** Acesso aos logs de console da instância para debug.
-
-### 🛡️ Segurança & Governança
-* **Autenticação:** JWT com expiração de 24h e suporte a rotação de segredos via ENV.
-* **Web Terminal:** Acesso root interativo via WebSocket binário (xterm.js) com suporte a redimensionamento de janela.
-* **Job System:** Fila de tarefas persistente em SQLite com recuperação automática de falhas e sistema de retry inteligente.
-
----
-
-## ⚙️ Automação (Scheduler)
-
-O Axion possui um **Scheduler Integrado** persistente:
-1.  **Cron Expressions:** Agendamento de tarefas recorrentes usando sintaxe padrão Cron.
-2.  **Persistence:** Agendamentos salvos no banco SQLite, sobrevivendo a reinícios.
-3.  **Job Dispatch:** O scheduler dispara Jobs para a fila do Worker Pool automaticamente.
-
----
-
-## 🧪 Ambientes de Uso
-
-* **HPC Labs:** Clusters de alta densidade para cálculos científicos.
-* **Game Servers:** Hospedagem de baixa latência (Minecraft, CS2, Rust).
-* **DevOps:** Ambientes de CI/CD efêmeros e reprodutíveis.
-* **Homelabs:** A alternativa leve e moderna ao Proxmox.
-
----
-
-## 📜 Licenciamento
-
-O **Axion NÃO é open-source completo**.
-
-* **Personal:** Gratuito para uso pessoal e aprendizado.
-* **Enterprise:** Licença comercial para uso em produção/revenda.
+### Estrutura de Desenvolvimento
+```
+axion/
+├── main.go               # Ponto de entrada do backend
+├── go.mod/go.sum         # Dependências Go
+├── internal/             # Código interno do backend
+├── frontend/             # Código Next.js do frontend
+├── .env.example          # Exemplo de variáveis de ambiente
+└── README.md             # Esta documentação
+```
 
 ---
 
 ## 🧭 Roadmap
 
-* [x] **v1.0 (Atual):** Containers/VMs, Rede, Storage, Terminal, Cloud-Init, Cluster Mode, Scheduler.
-* [ ] **v1.1:** Firewall por instância e Security Groups.
-* [ ] **v1.2:** Multi-tenant (SaaS Mode) e Billing Hooks.
-* [ ] **v2.0:** HA (Alta Disponibilidade) e Live Migration.
+### Recursos Futuros Planejados
+
+- 🔧 **Health Checks**: Monitoramento de saúde de instâncias com alertas proativos
+- 🛡️ **RBAC (Role-Based Access Control)**: Controle de acesso baseado em funções e permissões
+- 📦 **Restore UI**: Interface completa para restauração de backups e snapshots
+- 🌐 **Multi-node Clustering**: Suporte a múltiplos nodes LXD com balanceamento
+- 📊 **Alerting System**: Sistema de alertas baseado em thresholds de métricas
+- 🔐 **SAML/OAuth Integration**: Suporte a provedores de autenticação SSO
+- 📈 **Custom Dashboards**: Painéis personalizáveis para diferentes necessidades de monitoramento
 
 ---
 
-#### Desenvolvido por Pedrortxdev
-> *High Performance Computing for the Modern Era.*
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Para contribuir com o Axion:
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Commit suas alterações (`git commit -m 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+---
+
+## ❤️ Agradecimentos
+
+O Axion é possível graças a:
+
+- [LXD](https://linuxcontainers.org/lxd/) pelo poderoso back-end de containers e VMs
+- [Go](https://golang.org/) pela linguagem de programação de alta performance
+- [Next.js](https://nextjs.org/) pelo framework web moderno
+- [PostgreSQL](https://www.postgresql.org/) pelo banco de dados robusto e confiável
+
+</div>
+
+> **Axion Control Plane** - *Modern Infrastructure Management for the Cloud Era*
