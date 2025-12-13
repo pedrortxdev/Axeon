@@ -151,7 +151,7 @@ export default function InstanceDetailPage() {
          return <div className="flex justify-center items-center h-screen text-red-500">Instance not found.</div>;
     }
 
-    const isRunning = instance.status.toLowerCase() === 'running';
+    const isRunning = instance.status && typeof instance.status === 'string' ? instance.status.toLowerCase() === 'running' : false;
 
     return (
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">

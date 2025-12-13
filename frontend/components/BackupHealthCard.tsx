@@ -44,7 +44,7 @@ const BackupHealthCard: React.FC<BackupHealthCardProps> = ({
       return 'bg-zinc-700 text-zinc-300'; // Not run yet
     }
 
-    switch (backup_info.last_status.toLowerCase()) {
+    switch (backup_info.last_status && typeof backup_info.last_status === 'string' ? backup_info.last_status.toLowerCase() : '') {
       case 'completed':
         return 'bg-emerald-500/20 text-emerald-400';
       case 'failed':

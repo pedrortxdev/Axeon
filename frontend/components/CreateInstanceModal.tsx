@@ -4,6 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { X, Server, Box, Zap, FileCode, Code, Loader2, Monitor, User, Key, Network } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface Template {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  min_cpu: number;
+  min_ram_mb: number;
+}
+
 interface CreateInstanceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -11,8 +20,8 @@ interface CreateInstanceModalProps {
   initialType?: 'container' | 'virtual-machine';
 }
 
-// Validated Cloud-Init Templates
-const TEMPLATES = [
+// Validated Cloud-Init Templates (legacy, for direct YAML selection)
+const LEGACY_TEMPLATES = [
   {
     id: 'none',
     label: 'Clean OS',
@@ -70,6 +79,10 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
   const [userData, setUserData] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'config' | 'templates'>('config');
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   // Update defaults when initialType changes or modal opens
   useEffect(() => {
@@ -85,8 +98,43 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
         setTemplateId('none');
         setUserData('');
         setShowAdvanced(false);
+        setSelectedTemplate(null);
     }
   }, [isOpen, initialType]);
+
+  // Fetch templates when modal opens
+  useEffect(() => {
+    if (isOpen && activeTab === 'templates') {
+      fetchTemplates();
+    }
+  }, [isOpen, activeTab]);
+
+  const fetchTemplates = async () => {
+    if (!token) return;
+
+    setLoadingTemplates(true);
+    try {
+      const protocol = window.location.protocol;
+      const host = window.location.hostname;
+      const port = '8500';
+      const response = await fetch(`${protocol}//${host}:${port}/templates`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data);
+      } else {
+        toast.error('Failed to load templates', { description: 'Could not fetch available templates' });
+      }
+    } catch (error) {
+      toast.error('Network Error', { description: 'Could not reach control plane' });
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
 
   // Update user data when relevant fields change
   useEffect(() => {
@@ -94,7 +142,17 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
   }, [type, templateId, username, password]);
 
   const generateUserData = () => {
-    const templateYaml = TEMPLATES.find(t => t.id === templateId)?.yaml || '';
+    // Use selected template if one is selected, otherwise use legacy templates
+    let templateYaml = '';
+
+    if (selectedTemplate) {
+      // For new template system, we'll handle the cloud config in the backend
+      templateYaml = '';
+    } else {
+      // Use legacy templates
+      templateYaml = LEGACY_TEMPLATES.find(t => t.id === templateId)?.yaml || '';
+    }
+
     let yamlLines = ['#cloud-config'];
 
     // 1. User Configuration (VM Only)
@@ -121,35 +179,37 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
     yamlLines.push('packages:');
 
     if (type === 'virtual-machine') {
-      yamlLines.push('  - qemu-guest-agent'); 
+      yamlLines.push('  - qemu-guest-agent');
     }
 
-    // Add packages from template
-    const templateLines = templateYaml.split('\n');
-    let inPackagesSection = false;
-    for (const line of templateLines) {
-      if (line.trim() === 'packages:') {
-        inPackagesSection = true;
-        continue;
+    // Add packages from legacy template
+    if (!selectedTemplate) {
+      const templateLines = templateYaml.split('\n');
+      let inPackagesSection = false;
+      for (const line of templateLines) {
+        if (line.trim() === 'packages:') {
+          inPackagesSection = true;
+          continue;
+        }
+
+        if (inPackagesSection && line.trim().startsWith('  - ')) {
+          yamlLines.push(line);
+        } else if (inPackagesSection && !line.trim().startsWith('  - ') && line.trim() !== '') {
+          inPackagesSection = false;
+          break;
+        }
       }
 
-      if (inPackagesSection && line.trim().startsWith('  - ')) {
-        yamlLines.push(line);
-      } else if (inPackagesSection && !line.trim().startsWith('  - ') && line.trim() !== '') {
-        inPackagesSection = false;
-        break;
-      }
-    }
-
-    // Add remaining template content
-    let processingRest = false;
-    for (const line of templateLines) {
-      if (line.trim() === 'packages:') {
-        processingRest = true;
-        continue;
-      }
-      if (processingRest && !line.trim().startsWith('  - ')) {
-        yamlLines.push(line);
+      // Add remaining template content
+      let processingRest = false;
+      for (const line of templateLines) {
+        if (line.trim() === 'packages:') {
+          processingRest = true;
+          continue;
+        }
+        if (processingRest && !line.trim().startsWith('  - ')) {
+          yamlLines.push(line);
+        }
       }
     }
 
@@ -157,6 +217,22 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
   };
 
   if (!isOpen) return null;
+
+  const handleTemplateSelect = (template: Template) => {
+    setSelectedTemplate(template);
+    setTemplateId('none'); // Reset legacy template selection
+
+    // Auto-fill based on template requirements
+    if (template.min_cpu > cpu) {
+      setCpu(template.min_cpu);
+    }
+    if (template.min_ram_mb > memory) {
+      setMemory(template.min_ram_mb);
+    }
+
+    // Set default image based on template (all templates use Ubuntu 24.04)
+    setImage('ubuntu/24.04');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,7 +261,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
       const protocol = window.location.protocol;
       const host = window.location.hostname;
       const port = '8500';
-      const payload = {
+      const payload: any = {
         name: name.trim(),
         type: type,
         image: image,
@@ -193,8 +269,15 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
           "limits.cpu": cpu.toString(),
           "limits.memory": `${memory}MB`
         },
-        user_data: userData
       };
+
+      // Only add user_data if we're not using a template or using legacy templates
+      if (!selectedTemplate) {
+        payload.user_data = userData;
+      } else {
+        // If using a new template, add the template_id
+        payload.template_id = selectedTemplate.id;
+      }
 
       const response = await fetch(`${protocol}//${host}:${port}/instances`, {
         method: 'POST',
@@ -252,211 +335,317 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* Tab Navigation */}
+            <div className="flex border-b border-zinc-800">
+              <button
+                onClick={() => setActiveTab('config')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'config'
+                    ? 'text-zinc-200 border-b-2 border-indigo-500'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                Manual Configuration
+              </button>
+              <button
+                onClick={() => setActiveTab('templates')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'templates'
+                    ? 'text-zinc-200 border-b-2 border-indigo-500'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                App Templates
+              </button>
+            </div>
 
-            {/* Basic Configuration */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                <Server size={16} className="text-zinc-500" /> Configuration
-              </h3>
+            {/* Content based on active tab */}
+            {activeTab === 'config' ? (
+              <>
+                {/* Basic Configuration */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                    <Server size={16} className="text-zinc-500" /> Configuration
+                  </h3>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={type === 'container' ? "my-container-01" : "my-vm-01"}
-                    className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600"
-                    autoFocus
-                  />
-                </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Name</label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder={type === 'container' ? "my-container-01" : "my-vm-01"}
+                        className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600"
+                        autoFocus
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Image</label>
-                  <div className="relative">
-                    <select
-                      value={image}
-                      onChange={(e) => setImage(e.target.value)}
-                      className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all cursor-pointer"
-                    >
-                      {imagesList.map(img => (
-                        <option key={img.value} value={img.value}>{img.label}</option>
-                      ))}
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
-                      <Server size={16} />
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Image</label>
+                      <div className="relative">
+                        <select
+                          value={image}
+                          onChange={(e) => setImage(e.target.value)}
+                          className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all cursor-pointer"
+                        >
+                          {imagesList.map(img => (
+                            <option key={img.value} value={img.value}>{img.label}</option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
+                          <Server size={16} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Resources */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                <Zap size={16} className="text-zinc-500" /> Resources
-              </h3>
+                {/* Resources */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                    <Zap size={16} className="text-zinc-500" /> Resources
+                  </h3>
 
-              <div className="bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50 space-y-5">
-                {/* CPU */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs text-zinc-400">vCPU Allocation</span>
-                    <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{cpu} Cores</span>
+                  <div className="bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50 space-y-5">
+                    {/* CPU */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs text-zinc-400">vCPU Allocation</span>
+                        <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{cpu} Cores</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="8"
+                        step="1"
+                        value={cpu}
+                        onChange={(e) => setCpu(parseInt(e.target.value))}
+                        className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+                      />
+                    </div>
+
+                    {/* RAM */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs text-zinc-400">Memory Limit</span>
+                        <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{memory} MB</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="256"
+                        max="8192"
+                        step="256"
+                        value={memory}
+                        onChange={(e) => setMemory(parseInt(e.target.value))}
+                        className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    step="1"
-                    value={cpu}
-                    onChange={(e) => setCpu(parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
-                  />
                 </div>
 
-                {/* RAM */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs text-zinc-400">Memory Limit</span>
-                    <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{memory} MB</span>
+                {/* Access Configuration (Conditional) */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                    <User size={16} className="text-zinc-500" /> Access & Network
+                  </h3>
+
+                  <div className="space-y-4">
+                    {type === 'virtual-machine' ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Username</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="admin"
+                                className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
+                              />
+                              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                                <User size={16} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Password</label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
+                              />
+                              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                                <Key size={16} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                    ) : (
+                        <div className="p-3 bg-zinc-900/30 border border-zinc-800 rounded-lg flex items-center gap-3">
+                            <User size={16} className="text-zinc-500" />
+                            <span className="text-sm text-zinc-400">Authentication is disabled for Containers (System Container).</span>
+                        </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Network</label>
+                      <div className="inline-flex items-center px-3 py-1.5 bg-zinc-900/50 border border-zinc-800 rounded-lg text-xs text-zinc-400">
+                        <Network size={12} className="mr-1.5" />
+                        DHCP (Managed by LXD)
+                      </div>
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="256"
-                    max="8192"
-                    step="256"
-                    value={memory}
-                    onChange={(e) => setMemory(parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
-                  />
                 </div>
-              </div>
-            </div>
 
-            {/* Access Configuration (Conditional) */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                <User size={16} className="text-zinc-500" /> Access & Network
-              </h3>
+                {/* Templates */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                    <FileCode size={16} className="text-zinc-500" /> Cloud-Init Template
+                  </h3>
 
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Select Template</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {LEGACY_TEMPLATES.map(tmpl => (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => {
+                              setTemplateId(tmpl.id);
+                              setSelectedTemplate(null); // Reset new template selection
+                            }}
+                            className={`
+                              text-left p-3 rounded-lg border transition-all relative overflow-hidden
+                              ${templateId === tmpl.id
+                                ? 'bg-indigo-600/10 border-indigo-500/50 ring-1 ring-indigo-500/20'
+                                : 'bg-zinc-900/30 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700'
+                              }
+                            `}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <span className={`text-sm font-medium ${templateId === tmpl.id ? 'text-indigo-400' : 'text-zinc-300'}`}>
+                                {tmpl.label}
+                              </span>
+                              {templateId === tmpl.id && <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>}
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-tight">{tmpl.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* YAML Editor */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-medium text-zinc-400">Resulting YAML (Preview)</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowAdvanced(!showAdvanced)}
+                          className="text-xs text-zinc-500 hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                        >
+                          <Code size={12} />
+                          {showAdvanced ? 'Hide Editor' : 'Edit YAML'}
+                        </button>
+                      </div>
+
+                      {showAdvanced ? (
+                        <textarea
+                          value={userData}
+                          onChange={(e) => setUserData(e.target.value)}
+                          className="w-full h-48 bg-black/50 border border-zinc-800 rounded-lg p-3 font-mono text-xs text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-y"
+                          placeholder="#cloud-config..."
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-black/50 border border-zinc-800 rounded-lg p-3 font-mono text-xs text-zinc-300 overflow-y-auto whitespace-pre-wrap overflow-x-auto">
+                          {userData || <span className="text-zinc-600 italic">Select a template or enable editor to view YAML</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Templates Tab
               <div className="space-y-4">
-                {type === 'virtual-machine' ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Username</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="admin"
-                            className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
-                          />
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
-                            <User size={16} />
-                          </div>
-                        </div>
-                      </div>
+                <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <FileCode size={16} className="text-zinc-500" /> App Templates
+                </h3>
 
-                      <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Password</label>
-                        <div className="relative">
-                          <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full bg-zinc-900/50 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-zinc-600 pl-10"
-                          />
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
-                            <Key size={16} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                {loadingTemplates ? (
+                  <div className="flex justify-center items-center h-64">
+                    <Loader2 size={24} className="animate-spin text-indigo-500" />
+                  </div>
                 ) : (
-                    <div className="p-3 bg-zinc-900/30 border border-zinc-800 rounded-lg flex items-center gap-3">
-                        <User size={16} className="text-zinc-500" />
-                        <span className="text-sm text-zinc-400">Authentication is disabled for Containers (System Container).</span>
-                    </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Network</label>
-                  <div className="inline-flex items-center px-3 py-1.5 bg-zinc-900/50 border border-zinc-800 rounded-lg text-xs text-zinc-400">
-                    <Network size={12} className="mr-1.5" />
-                    DHCP (Managed by LXD)
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Templates */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                <FileCode size={16} className="text-zinc-500" /> Cloud-Init Template
-              </h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Select Template</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {TEMPLATES.map(tmpl => (
-                      <button
-                        key={tmpl.id}
-                        type="button"
-                        onClick={() => setTemplateId(tmpl.id)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {templates.map((template) => (
+                      <div
+                        key={template.id}
+                        onClick={() => handleTemplateSelect(template)}
                         className={`
-                          text-left p-3 rounded-lg border transition-all relative overflow-hidden
-                          ${templateId === tmpl.id
-                            ? 'bg-indigo-600/10 border-indigo-500/50 ring-1 ring-indigo-500/20'
+                          p-4 rounded-xl border cursor-pointer transition-all
+                          ${selectedTemplate?.id === template.id
+                            ? 'bg-indigo-600/10 border-indigo-500 ring-1 ring-indigo-500/20'
                             : 'bg-zinc-900/30 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700'
                           }
                         `}
                       >
-                        <div className="flex justify-between items-start mb-1">
-                          <span className={`text-sm font-medium ${templateId === tmpl.id ? 'text-indigo-400' : 'text-zinc-300'}`}>
-                            {tmpl.label}
-                          </span>
-                          {templateId === tmpl.id && <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>}
+                        <div className="flex items-start gap-3">
+                          <div className="text-2xl">{template.icon}</div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className={`font-medium ${selectedTemplate?.id === template.id ? 'text-indigo-400' : 'text-zinc-200'}`}>
+                                {template.name}
+                              </h4>
+                              {selectedTemplate?.id === template.id && (
+                                <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
+                              )}
+                            </div>
+                            <p className="text-sm text-zinc-400 mb-2">{template.description}</p>
+                            <div className="flex items-center gap-2 text-xs text-zinc-500">
+                              <span>Min: {template.min_cpu} CPU</span>
+                              <span>•</span>
+                              <span>{template.min_ram_mb} MB RAM</span>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-zinc-500 leading-tight">{tmpl.description}</p>
-                      </button>
+                      </div>
                     ))}
                   </div>
-                </div>
+                )}
 
-                {/* YAML Editor */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-medium text-zinc-400">Resulting YAML (Preview)</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="text-xs text-zinc-500 hover:text-indigo-400 flex items-center gap-1 transition-colors"
-                    >
-                      <Code size={12} />
-                      {showAdvanced ? 'Hide Editor' : 'Edit YAML'}
-                    </button>
-                  </div>
-
-                  {showAdvanced ? (
-                    <textarea
-                      value={userData}
-                      onChange={(e) => setUserData(e.target.value)}
-                      className="w-full h-48 bg-black/50 border border-zinc-800 rounded-lg p-3 font-mono text-xs text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-y"
-                      placeholder="#cloud-config..."
-                    />
-                  ) : (
-                    <div className="w-full h-48 bg-black/50 border border-zinc-800 rounded-lg p-3 font-mono text-xs text-zinc-300 overflow-y-auto whitespace-pre-wrap overflow-x-auto">
-                      {userData || <span className="text-zinc-600 italic">Select a template or enable editor to view YAML</span>}
+                {selectedTemplate && (
+                  <div className="mt-4 p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium text-zinc-200">Selected Template</h4>
+                      <button
+                        onClick={() => setSelectedTemplate(null)}
+                        className="text-xs text-zinc-500 hover:text-zinc-300"
+                      >
+                        Clear selection
+                      </button>
                     </div>
-                  )}
-                </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl">{selectedTemplate.icon}</div>
+                      <div>
+                        <div className="text-sm font-medium text-zinc-200">{selectedTemplate.name}</div>
+                        <div className="text-xs text-zinc-400">{selectedTemplate.description}</div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+                          <span>Min: {selectedTemplate.min_cpu} CPU</span>
+                          <span>•</span>
+                          <span>{selectedTemplate.min_ram_mb} MB RAM</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
           </div>
 

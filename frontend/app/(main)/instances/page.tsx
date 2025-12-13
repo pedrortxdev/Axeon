@@ -472,7 +472,7 @@ export default function InstancesPage() {
       ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredMetrics.map((inst) => {
-          const isRunning = inst.status.toLowerCase() === 'running';
+          const isRunning = inst.status && typeof inst.status === 'string' ? inst.status.toLowerCase() === 'running' : false;
           const histData = history[inst.name]?.data || [];
           const isBusy = isInstanceBusy(inst.name);
           const isSettingsOpen = showSettings[inst.name];

@@ -19,6 +19,7 @@ import (
 	"aexon/internal/monitor"
 	"aexon/internal/provider/lxc"
 	"aexon/internal/scheduler"
+	"aexon/internal/service"
 	"aexon/internal/types"
 	"aexon/internal/utils"
 	"aexon/internal/worker"
@@ -38,11 +39,12 @@ type InstanceLimitsRequest struct {
 }
 
 type CreateInstanceRequest struct {
-	Name     string            `json:"name" binding:"required"`
-	Image    string            `json:"image" binding:"required"`
-	Limits   map[string]string `json:"limits"`
-	UserData string            `json:"user_data"` // Opcional: Cloud-Init
-	Type     string            `json:"type"`      // Instance type: "container" or "virtual-machine"
+	Name       string            `json:"name" binding:"required"`
+	Image      string            `json:"image" binding:"required"`
+	Limits     map[string]string `json:"limits"`
+	UserData   string            `json:"user_data"`   // Opcional: Cloud-Init
+	Type       string            `json:"type"`        // Instance type: "container" or "virtual-machine"
+	TemplateID string            `json:"template_id"` // Opcional: ID do template a ser usado
 }
 
 type SnapshotRequest struct {
@@ -131,6 +133,53 @@ func main() {
 				c.JSON(400, gin.H{"error": "JSON inválido. Campos obrigatórios: name, image"})
 				return
 			}
+
+			// If template is specified, process it
+			enhancedUserData := req.UserData
+			if req.TemplateID != "" {
+				templates := service.GetTemplates()
+				templateFound := false
+				for _, template := range templates {
+					if template.ID == req.TemplateID {
+						// Validate that the instance meets the template's minimum requirements
+						reqCpu := 1
+						if val, ok := req.Limits["limits.cpu"]; ok {
+							reqCpu = utils.ParseCpuCores(val)
+						}
+						reqRam := int64(512)
+						if val, ok := req.Limits["limits.memory"]; ok {
+							reqRam = utils.ParseMemoryToMB(val)
+						}
+
+						// Check if template requirements are met
+						if reqCpu < template.MinCPU {
+							c.JSON(400, gin.H{"error": fmt.Sprintf("CPU insuficiente. Template %s requer no mínimo %d CPU(s)", template.Name, template.MinCPU)})
+							return
+						}
+						if reqRam < int64(template.MinRAM) {
+							c.JSON(400, gin.H{"error": fmt.Sprintf("RAM insuficiente. Template %s requer no mínimo %d MB", template.Name, template.MinRAM)})
+							return
+						}
+
+						// Merge template cloud config with existing user data
+						if req.UserData != "" {
+							// If both template and user data exist, we need to merge them
+							enhancedUserData = template.CloudConfig + "\n" + req.UserData
+						} else {
+							// Only use template cloud config
+							enhancedUserData = template.CloudConfig
+						}
+						templateFound = true
+						break
+					}
+				}
+
+				if !templateFound {
+					c.JSON(404, gin.H{"error": fmt.Sprintf("Template com ID %s não encontrado", req.TemplateID)})
+					return
+				}
+			}
+
 			reqCpu := 1
 			if val, ok := req.Limits["limits.cpu"]; ok {
 				reqCpu = utils.ParseCpuCores(val)
@@ -149,7 +198,7 @@ func main() {
 				Name:            req.Name,
 				Image:           req.Image,
 				Limits:          req.Limits,
-				UserData:        req.UserData,
+				UserData:        enhancedUserData,
 				Type:            req.Type,
 				BackupSchedule:  "@daily",
 				BackupRetention: 7,
@@ -454,6 +503,12 @@ func main() {
 			}
 			c.JSON(200, job)
 		})
+
+		protected.GET("/templates", func(c *gin.Context) {
+			templates := service.GetTemplates()
+			c.JSON(200, templates)
+		})
+
 		protected.GET("/ws/telemetry", func(c *gin.Context) {
 			api.StreamTelemetry(c, lxcClient, func(metrics []lxc.InstanceMetric) {
 				for _, m := range metrics {

@@ -67,8 +67,12 @@ export default function InstanceMetricsCharts({ instanceName, token }: InstanceM
       return (
         <div className="bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg p-3 text-sm shadow-lg">
           <p className="label text-zinc-400">{`${new Date(label).toLocaleString()}`}</p>
-          <p className="intro text-indigo-400">{`Memory: ${formatBytes(payload[0].value)}`}</p>
-          <p className="intro text-cyan-400">{`CPU: ${payload[1].value.toFixed(2)} %`}</p>
+          {payload[0] && payload[0].value !== undefined && (
+            <p className="intro text-indigo-400">{`Memory: ${formatBytes(payload[0].value)}`}</p>
+          )}
+          {payload[1] && payload[1].value !== undefined && (
+            <p className="intro text-cyan-400">{`CPU: ${payload[1].value !== undefined && payload[1].value !== null ? payload[1].value.toFixed(2) : '0.00'} %`}</p>
+          )}
         </div>
       );
     }
