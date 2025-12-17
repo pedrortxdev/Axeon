@@ -1,21 +1,58 @@
 {
   "name": "Axion Dev Container",
   "image": "mcr.microsoft.com/devcontainers/go:1-1.22-bookworm",
+  
+  // Habilita permissões avançadas (útil se você tentar rodar Docker/LXD dentro)
   "runArgs": [
-    "--privileged", 
+    "--privileged",
     "--cgroupns=host"
   ],
+
   "features": {
+    // Instala Docker (opcional, mas bom ter)
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/go:1": {}
+    
+    // 🔥 A MÁGICA DO BANCO DE DADOS 🔥
+    // Isso instala o Postgres e já cria o usuário/senha/db para você!
+    "ghcr.io/devcontainers/features/postgres:1": {
+      "version": "16",
+      "username": "axion",
+      "password": "axion_password",
+      "database": "axion_db"
+    },
+    
+    // Ferramentas úteis de rede (curl, ip, etc)
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true
+    }
   },
+
+  // Extensões do VS Code que serão instaladas sozinhas
   "customizations": {
     "vscode": {
       "extensions": [
         "golang.go",
-        "dbaeumer.vscode-eslint"
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss"
       ]
     }
   },
-  "postCreateCommand": "sudo service postgresql start && go mod tidy"
+
+  // Comandos para rodar assim que o container criar
+  // 1. Garante que as dependências do Go estão baixadas
+  // 2. Instala dependências do Frontend (se a pasta existir)
+  "postCreateCommand": "go mod tidy && cd frontend && npm install",
+
+  // Variáveis de ambiente globais para o container
+  "remoteEnv": {
+    "DB_HOST": "localhost",
+    "DB_USER": "axion",
+    "DB_PASSWORD": "axion_password",
+    "DB_NAME": "axion_db",
+    "DB_PORT": "5432"
+  },
+
+  // Expõe as portas (Frontend: 3500, Backend: 8500, DB: 5432)
+  "forwardPorts": [3500, 8500, 5432]
 }
