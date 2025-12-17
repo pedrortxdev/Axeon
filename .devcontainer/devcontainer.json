@@ -1,0 +1,21 @@
+{
+  "name": "Axion Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/go:1-1.22-bookworm",
+  "runArgs": [
+    "--privileged", 
+    "--cgroupns=host"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/go:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "postCreateCommand": "sudo service postgresql start && go mod tidy"
+}
