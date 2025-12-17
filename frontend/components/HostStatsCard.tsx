@@ -1,27 +1,6 @@
 import { Cpu, HardDrive, MemoryStick, Activity } from 'lucide-react';
 import clsx from 'clsx';
-
-interface HostStats {
-  // Supporting both camelCase and snake_case field names
-  cpuPercent?: number;
-  cpu_percent?: number;
-  memoryUsedMB?: number;
-  memory_used_mb?: number;
-  memoryTotalMB?: number;
-  memory_total_mb?: number;
-  diskUsedGB?: number;
-  disk_used_gb?: number;
-  diskTotalGB?: number;
-  disk_total_gb?: number;
-  netRxKB?: number;
-  net_rx_kb?: number;
-  netTxKB?: number;
-  net_tx_kb?: number;
-  cpuCores?: number;
-  cpu_cores?: number;
-  cpuModel?: string;
-  cpu_model?: string;
-}
+import { HostStats } from '@/types';
 
 interface HostStatsCardProps {
   data: HostStats | null;

@@ -46,9 +46,52 @@ export interface InstanceDevices {
 export interface InstanceBackupInfo {
   enabled: boolean;
   schedule: string;
+  retention?: number; // Added this line
   next_run?: string; // ISO date string
   last_run?: string; // ISO date string
   last_status?: string; // "completed", "failed", etc.
+}
+
+export interface InstanceState {
+    status: string;
+    status_code: number;
+    disk: {
+        [deviceName: string]: {
+            usage: number;
+        };
+    };
+    memory: {
+        usage: number;
+        usage_peak: number;
+        swap_usage: number;
+        swap_usage_peak: number;
+        total: number;
+    };
+    network: {
+        [interfaceName: string]: {
+            addresses: {
+                family: string;
+                address: string;
+                netmask: string;
+                scope: string;
+            }[];
+            counters: {
+                bytes_received: number;
+                bytes_sent: number;
+                packets_received: number;
+                packets_sent: number;
+            };
+            hwaddr: string;
+            mtu: number;
+            state: string;
+            type: string;
+        };
+    };
+    pid: number;
+    processes: number;
+    cpu: {
+        usage: number;
+    };
 }
 
 export interface InstanceMetric {
@@ -63,14 +106,43 @@ export interface InstanceMetric {
   network_tx_bytes: number;
   config: InstanceConfig;
   devices?: InstanceDevices;
-  state?: any; // To include full instance state from API, including network info
+  state?: InstanceState; 
   backup_info?: InstanceBackupInfo; // Added for backup observability
 }
 
 export interface WSEvent {
-  type: 'job_update' | 'state_change';
+  type: 'job_update' | 'state_change'; // Reverted this line
   job_id?: string;
   target?: string;
-  payload: any;
+  payload: unknown; // Changed from any to unknown
   timestamp: number;
 }
+
+export interface HostStats {
+  // Supporting both camelCase and snake_case field names
+  cpuPercent?: number;
+  cpu_percent?: number;
+  memoryUsedMB?: number;
+  memory_used_mb?: number;
+  memoryTotalMB?: number;
+  memory_total_mb?: number;
+  diskUsedGB?: number;
+  disk_used_gb?: number;
+  diskTotalGB?: number;
+  disk_total_gb?: number;
+  netRxKB?: number;
+  net_rx_kb?: number;
+  netTxKB?: number;
+  net_tx_kb?: number;
+  cpuCores?: number;
+  cpu_cores?: number;
+  cpuModel?: string;
+  cpu_model?: string;
+}
+
+export interface MetricHistory {
+  timestamp: string;
+  cpu_usage: number;
+  memory_usage: number;
+}
+

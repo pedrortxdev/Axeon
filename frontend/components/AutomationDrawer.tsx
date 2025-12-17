@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CalendarClock, Trash2, Plus, X, Loader2, AlertTriangle, Clock } from 'lucide-react';
+import { CalendarClock, Trash2, Plus, X, Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Schedule, JobType } from '@/types';
 
@@ -23,13 +23,7 @@ export default function AutomationDrawer({ isOpen, onClose, instanceName }: Auto
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('axion_token') : null;
 
-  useEffect(() => {
-    if (isOpen && instanceName && token) {
-      fetchSchedules();
-    }
-  }, [isOpen, instanceName, token]);
-
-  const fetchSchedules = async () => {
+  const fetchSchedules = React.useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -45,12 +39,18 @@ export default function AutomationDrawer({ isOpen, onClose, instanceName }: Auto
         const filtered = (data || []).filter((s: Schedule) => s.target === instanceName);
         setSchedules(filtered);
       }
-    } catch (err) {
+    } catch (err: unknown) { // Catch API errors
       toast.error('Failed to fetch schedules');
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, instanceName]);
+
+  useEffect(() => {
+    if (isOpen && instanceName && token) {
+      fetchSchedules();
+    }
+  }, [isOpen, instanceName, token, fetchSchedules]);
 
   const handleCreate = async () => {
     if (!token || !instanceName) return;
@@ -59,8 +59,9 @@ export default function AutomationDrawer({ isOpen, onClose, instanceName }: Auto
     try {
       const cronExpr = frequency === 'custom' ? customCron : frequency;
       
+      type AutomationPayload = Record<string, unknown>; // More specific than {}
       let type: JobType;
-      let payloadObj: any = {};
+      let payloadObj: AutomationPayload = {};
 
       if (actionType === 'restart') {
         type = 'state_change';
@@ -97,10 +98,10 @@ export default function AutomationDrawer({ isOpen, onClose, instanceName }: Auto
         setFrequency('@daily');
         setActionType('create_snapshot');
       } else {
-        const err = await res.json();
+        const err: { error?: string } = await res.json(); // Catch API errors
         toast.error('Failed to create schedule', { description: err.error });
       }
-    } catch (err) {
+    } catch (err: unknown) { // Catch network errors
       toast.error('Network error');
     } finally {
       setCreating(false);
@@ -126,7 +127,7 @@ export default function AutomationDrawer({ isOpen, onClose, instanceName }: Auto
         } else {
             toast.error('Failed to delete');
         }
-    } catch (err) {
+    } catch (err: unknown) { // Catch network errors
         toast.error('Network error');
     }
   };
@@ -197,7 +198,7 @@ export default function AutomationDrawer({ isOpen, onClose, instanceName }: Auto
                         <label className="text-xs font-medium text-zinc-500">Action</label>
                         <select 
                             value={actionType} 
-                            onChange={(e) => setActionType(e.target.value as any)}
+                            onChange={(e) => setActionType(e.target.value as JobType | 'restart')}
                             className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
                         >
                             <option value="create_snapshot">Backup (Snapshot)</option>

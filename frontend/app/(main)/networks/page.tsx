@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -35,7 +35,7 @@ export default function NetworksPage() {
     }
   }, [router]);
 
-  const fetchNetworks = async () => {
+  const fetchNetworks = React.useCallback(async () => {
     if (!token) return;
 
     setIsLoading(true);
@@ -43,7 +43,7 @@ export default function NetworksPage() {
       const protocol = window.location.protocol;
       const host = window.location.hostname;
       const port = '8500';
-      
+
       const response = await fetch(`${protocol}//${host}:${port}/networks`, {
         method: 'GET',
         headers: {
@@ -65,7 +65,7 @@ export default function NetworksPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
   const createNetwork = async () => {
     if (!token) return;
@@ -146,7 +146,7 @@ export default function NetworksPage() {
     if (token) {
       fetchNetworks();
     }
-  }, [token]);
+  }, [token, fetchNetworks]);
 
   if (!token) return null;
 

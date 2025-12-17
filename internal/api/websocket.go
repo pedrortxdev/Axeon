@@ -63,7 +63,7 @@ func StreamTelemetry(c *gin.Context, instanceService *lxc.InstanceService, metri
 
 				// Tenta enviar. Se o contexto for cancelado ou buffer cheio, desiste.
 				select {
-				case sendChan <- metrics:
+				case sendChan <- gin.H{"type": "instance_metrics", "data": metrics}:
 				case <-ctx.Done():
 					return
 				default:

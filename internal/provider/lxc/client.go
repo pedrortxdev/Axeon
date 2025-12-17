@@ -247,7 +247,7 @@ func (s *InstanceService) ListInstances() ([]InstanceMetric, error) {
 			Location:         inst.Location,
 			Name:             inst.Name,
 			Type:             inst.Type,
-			Status:           inst.Status,
+			Status:           strings.ToUpper(inst.Status),
 			MemoryUsageBytes: memBytes,
 			CPUUsageSeconds:  cpuSeconds,
 			DiskUsageBytes:   diskBytes,
@@ -442,6 +442,114 @@ func (s *InstanceService) CreateInstance(name string, imageAlias string, instanc
 	log.Printf("[Create] Sucesso confirmado para %s", name)
 	return nil
 }
+
+// CreateInstanceWithISO creates a new VM with an ISO file for installation
+func (s *InstanceService) CreateInstanceWithISO(name string, imageAlias string, instanceType string, limits map[string]string, userData string, isoPath string) error {
+	// 1. Lock check
+	if _, busy := s.locks.LoadOrStore(name, true); busy {
+		return fmt.Errorf("LOCKED: %s está ocupado", name)
+	}
+	defer s.locks.Delete(name)
+
+	// 2. Validate instance type (must be virtual-machine for ISO installation)
+	if instanceType != "virtual-machine" {
+		return fmt.Errorf("ISO installation is only supported for virtual-machine type, got: %s", instanceType)
+	}
+
+	// 3. Validate ISO file exists
+	if _, err := os.Stat(isoPath); os.IsNotExist(err) {
+		return fmt.Errorf("ISO file does not exist: %s", isoPath)
+	}
+
+	// 4. Configuração
+	config := make(map[string]string)
+	for k, v := range limits {
+		config[k] = v
+	}
+
+	// VM-specific configurations for ISO boot
+	config["security.secureboot"] = "false"
+	config["security.csm"] = "true"  // Enable CSM for legacy boot support
+	config["boot.autostart"] = "true"  // Make sure VM starts automatically
+	config["volatile.base_image"] = "custom-iso"  // Indicate this is a custom ISO installation
+
+	if userData != "" {
+		config["user.user-data"] = userData
+		// FIX: Configuração de rede universal (funciona para eth0 e enp5s0)
+		config["cloud-init.network-config"] = "version: 2\nethernets:\n  all-interfaces:\n    match:\n      name: \"e*\"\n    dhcp4: true"
+	}
+
+	req := api.InstancesPost{
+		Name: name,
+		Type: api.InstanceType(instanceType), // Vital for VM
+		Source: api.InstanceSource{
+			Type: "none", // Create empty VM without base image
+		},
+		InstancePut: api.InstancePut{
+			Config: config,
+			Devices: map[string]map[string]string{
+				"root": {
+					"type": "disk",
+					"path": "/",
+					"pool": "axion",
+				},
+				"eth0": {
+					"type":    "nic",
+					"name":    "eth0",
+					"network": "axion-br",
+				},
+				// Add ISO device to boot from
+				"iso": {
+					"type":     "disk",
+					"source":   isoPath,      // Path to the ISO file
+					"path":     "/dev/sr0",   // CD-ROM device path
+					"readonly": "true",
+				},
+			},
+			Profiles: []string{"default"},
+		},
+	}
+
+	log.Printf("[Create] Iniciando criação de VM %s (%s) com ISO de boot...", name, instanceType)
+
+	// 5. Execução Assíncrona
+	op, err := s.server.CreateInstance(req)
+	if err != nil {
+		return fmt.Errorf("LXD recusou a request para VM com ISO: %w", err)
+	}
+
+	// 6. Esperar a Operação
+	log.Printf("[Create] Aguardando operação do LXD...")
+	if err := op.Wait(); err != nil {
+		return fmt.Errorf("LXD falhou durante a criação da VM com ISO: %w", err)
+	}
+
+	// 7. O TIRA-TEIMA (Double Check)
+	// Verifica se a instância realmente existe no banco do LXD
+	_, _, err = s.server.GetInstance(name)
+	if err != nil {
+		return fmt.Errorf("ERRO FANTASMA: LXD disse sucesso, mas a instância '%s' não foi encontrada: %w", name, err)
+	}
+
+	// 8. Auto-Start: Iniciar a instância imediatamente
+	log.Printf("[Create] Iniciando boot de %s a partir do ISO...", name)
+	reqState := api.InstanceStatePut{
+		Action:  "start",
+		Timeout: -1,
+	}
+
+	opStart, err := s.server.UpdateInstanceState(name, reqState, "")
+	if err != nil {
+		return fmt.Errorf("falha ao solicitar start pós-criação: %w", err)
+	}
+
+	if err := opStart.Wait(); err != nil {
+		return fmt.Errorf("falha ao iniciar instância: %w", err)
+	}
+
+	log.Printf("[Create] Sucesso confirmado para VM com ISO: %s", name)
+	return nil
+}
 func (s *InstanceService) DeleteInstance(name string) error {
 	if _, busy := s.locks.LoadOrStore(name, true); busy {
 		return fmt.Errorf("LOCKED: container '%s' já está sendo operado", name)
@@ -458,7 +566,7 @@ func (s *InstanceService) DeleteInstance(name string) error {
 		return fmt.Errorf("falha ao verificar container: %w", err)
 	}
 
-	if inst.Status == "Running" {
+	if strings.ToUpper(inst.Status) == "RUNNING" {
 		log.Printf("[LXD Provider] Parando '%s' antes da exclusão...", name)
 		req := api.InstanceStatePut{
 			Action:  "stop",
@@ -535,7 +643,7 @@ func (s *InstanceService) RestoreSnapshot(instanceName string, snapshotName stri
 		return fmt.Errorf("falha ao obter info do container: %w", err)
 	}
 
-	if inst.Status == "Running" {
+	if strings.ToUpper(inst.Status) == "RUNNING" {
 		log.Printf("[LXD Provider] Parando container para restauração...")
 		stopReq := api.InstanceStatePut{
 			Action:  "stop",
@@ -847,6 +955,16 @@ func (s *InstanceService) GetInstanceLog(instanceName string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+// Server returns the underlying LXD server client
+func (s *InstanceService) Server() lxd.InstanceServer {
+	return s.server
+}
+
+// GetInstanceState wraps the LXD server's GetInstanceState method
+func (s *InstanceService) GetInstanceState(instanceName string) (*api.InstanceState, string, error) {
+	return s.server.GetInstanceState(instanceName)
 }
 
 // ListNetworks returns a list of bridge networks

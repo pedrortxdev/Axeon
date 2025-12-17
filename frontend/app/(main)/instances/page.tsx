@@ -12,10 +12,9 @@ import SnapshotDrawer from '@/components/SnapshotDrawer';
 import NetworkDrawer from '@/components/NetworkDrawer';
 import FileExplorerDrawer from '@/components/FileExplorerDrawer';
 import WebTerminal from '@/components/WebTerminal';
-import HostStatsCard from '@/components/HostStatsCard';
-import ClusterStatus from '@/components/ClusterStatus';
 import BackupPolicyModal from '@/components/BackupPolicyModal';
 import { Job, InstanceMetric } from '@/types';
+import { formatBytes } from '@/lib/utils'; // Import formatBytes
 
 // --- Types Local ---
 
@@ -32,32 +31,6 @@ interface ResourceState {
 
 // --- Helper Functions ---
 
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const formatMemToMB = (bytes: number) => {
-  return parseFloat((bytes / (1024 * 1024)).toFixed(1));
-};
-
-const parseMemoryString = (memStr?: string): number => {
-  if (!memStr) return 128;
-  const match = memStr.match(/^(\d+)(MB|GB)?$/i);
-  if (!match) return 128;
-  const value = parseInt(match[1], 10);
-  const unit = match[2]?.toUpperCase();
-  if (unit === 'GB') return value * 1024;
-  return value;
-};
-
-const parseCpuString = (cpuStr?: string): number => {
-  if (!cpuStr) return 1;
-  return parseInt(cpuStr, 10) || 1;
-};
 
 // --- Component ---
 
@@ -66,20 +39,18 @@ export default function InstancesPage() {
   const [metrics, setMetrics] = useState<InstanceMetric[]>([]);
   const [history, setHistory] = useState<Record<string, InstanceHistory>>({});
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [connected, setConnected] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<string>('-');
-  const [token, setToken] = useState<string | null>(null);
-  const [hostStats, setHostStats] = useState<any>(null); // We'll use any to match the HostStats interface
+  const storedToken = typeof window !== 'undefined' ? localStorage.getItem('axion_token') : null;
+  const [token] = useState<string | null>(storedToken);
 
   // UI State
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalType, setCreateModalType] = useState<'container' | 'virtual-machine'>('container');
   const [snapshotInstance, setSnapshotInstance] = useState<string | null>(null);
-  const [networkInstance, setNetworkInstance] = useState<string | null>(null);
+  const [networkInstance, setNetworkInstance] = useState<InstanceMetric | null>(null);
   const [fileInstance, setFileInstance] = useState<string | null>(null);
   const [terminalInstance, setTerminalInstance] = useState<string | null>(null);
-  const [backupPolicyInstance, setBackupPolicyInstance] = useState<string | null>(null);
+  const [backupPolicyInstance, setBackupPolicyInstance] = useState<InstanceMetric | null>(null);
   const [showSettings, setShowSettings] = useState<Record<string, boolean>>({});
   const [resourceInputs, setResourceInputs] = useState<Record<string, ResourceState>>({});
   
@@ -90,190 +61,81 @@ export default function InstancesPage() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   // Refs
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const draggingRef = useRef<Record<string, boolean>>({});
 
   const router = useRouter();
+  const wsRef = useRef<WebSocket | null>(null);
+
 
   // --- Auth Check ---
   useEffect(() => {
-    const storedToken = localStorage.getItem('axion_token');
-    if (!storedToken) {
+    if (!token) {
         router.push('/login');
-    } else {
-        setToken(storedToken);
     }
-  }, [router]);
+  }, [router, token]);
 
-  // --- Initial Data Fetch ---
+  // --- WebSocket Telementry ---
   useEffect(() => {
     if (!token) return;
-
-    const fetchJobs = async () => {
-      try {
-        const protocol = window.location.protocol;
-        const host = window.location.hostname;
-        const port = '8500';
-        const res = await fetch(`${protocol}//${host}:${port}/jobs`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (res.status === 401) {
-            localStorage.removeItem('axion_token');
-            router.push('/login');
-            return;
-        }
-
-        if (res.ok) {
-          const data = await res.json();
-          setJobs(data || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch jobs:", err);
-      }
-    };
-    fetchJobs();
-  }, [token, router]);
-
-  // --- WebSocket Logic ---
-  const connect = () => {
-    if (!token) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname;
     const wsUrl = `${protocol}//${host}:8500/ws/telemetry?token=${token}`;
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    const connect = () => {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setConnected(true);
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-    };
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const rawData = JSON.parse(event.data);
-        if (!rawData) return;
-
-        if (Array.isArray(rawData)) {
-            handleTelemetry(rawData);
+      ws.onmessage = (event) => {
+        try {
+          const rawData = JSON.parse(event.data);
+          
+          if (Array.isArray(rawData)) {
+            setMetrics(rawData);
             return;
+          }
+          
+          if (rawData && rawData.type === 'instance_metrics') {
+            setMetrics(rawData.data);
+          }
+          if (rawData && rawData.type === 'instance_history') {
+            setHistory(rawData.data);
+          }
+          if (rawData && rawData.type === 'jobs_update') {
+            setJobs(rawData.data);
+          }
+
+        } catch (err) {
+          console.error('WS parsing error:', err);
         }
-        if (rawData.type === 'job_update') {
-            handleJobUpdate(rawData.payload as Job);
-        }
-        if (rawData.type === 'host_telemetry') {
-            setHostStats(rawData.data);
-        }
-      } catch (err) {
-        console.error('WS parsing error:', err);
-      }
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected, attempting to reconnect...');
+        // Clean up the old socket
+        wsRef.current = null;
+        // Reconnect after a delay
+        setTimeout(connect, 5000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        ws.close();
+      };
     };
 
-    ws.onclose = () => {
-      setConnected(false);
-      wsRef.current = null;
-      scheduleReconnect();
-    };
+    connect();
 
-    ws.onerror = () => ws.close();
-  };
-
-  const scheduleReconnect = () => {
-    if (!reconnectTimeoutRef.current) {
-      reconnectTimeoutRef.current = setTimeout(() => {
-        reconnectTimeoutRef.current = null;
-        connect();
-      }, 2000);
-    }
-  };
-
-  useEffect(() => {
-    if (token) connect();
     return () => {
-      if (wsRef.current) wsRef.current.close();
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, [token]);
-
-  // --- Message Handlers ---
-
-  const handleTelemetry = (data: InstanceMetric[]) => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setLastUpdate(timeStr);
-    setMetrics(data);
-
-    setResourceInputs(prev => {
-        const next = { ...prev };
-        let changed = false;
-        data.forEach(inst => {
-            const isDragging = draggingRef.current[inst.name];
-            const currentLocal = next[inst.name];
-            if (!isDragging && (!currentLocal || !currentLocal.isDirty)) {
-                // Config might be null during provisioning
-                const memVal = inst.config?.["limits.memory"];
-                const cpuVal = inst.config?.["limits.cpu"];
-                
-                const serverMem = parseMemoryString(memVal);
-                const serverCpu = parseCpuString(cpuVal);
-                if (!currentLocal || currentLocal.memoryInput !== serverMem || currentLocal.cpuInput !== serverCpu) {
-                    next[inst.name] = { memoryInput: serverMem, cpuInput: serverCpu, isDirty: false };
-                    changed = true;
-                }
-            }
-        });
-        return changed ? next : prev;
-    });
-
-    setHistory(prevHistory => {
-      const newHistory = { ...prevHistory };
-      data.forEach(instance => {
-        if (!newHistory[instance.name]) newHistory[instance.name] = { name: instance.name, data: [] };
-        const currentData = [...newHistory[instance.name].data];
-        currentData.push({ time: timeStr, memoryMB: formatMemToMB(instance.memory_usage_bytes) });
-        if (currentData.length > 60) currentData.shift();
-        newHistory[instance.name] = { ...newHistory[instance.name], data: currentData };
-      });
-      return newHistory;
-    });
-  };
-
-  const handleJobUpdate = (job: Job) => {
-    setJobs(prevJobs => {
-        const index = prevJobs.findIndex(j => j.id === job.id);
-        if (index !== -1) {
-            const updated = [...prevJobs];
-            updated[index] = job;
-            return updated;
-        }
-        return [job, ...prevJobs];
-    });
-
-    if (job.status === 'COMPLETED') {
-        toast.success(
-            <div className="flex flex-col gap-1">
-                <span className="font-semibold">Operation Completed</span>
-                <span className="text-xs text-zinc-400">{job.type} on {job.target} finished successfully.</span>
-            </div>
-        );
-    } else if (job.status === 'FAILED') {
-        toast.error(
-            <div className="flex flex-col gap-1">
-                <span className="font-semibold">Operation Failed</span>
-                <span className="text-xs text-zinc-400">{job.error}</span>
-            </div>
-        );
-    }
-  };
-
-  // --- Actions ---
 
   const handlePowerAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
     if (!token) return;
@@ -301,7 +163,7 @@ export default function InstancesPage() {
         const error = await response.json();
         toast.error("Request Rejected", { description: error.error });
       }
-    } catch (error) {
+    } catch {
         toast.error("Network Error");
     }
   };
@@ -338,7 +200,7 @@ export default function InstancesPage() {
         const error = await response.json();
         toast.error("Update Rejected", { description: error.error });
       }
-    } catch (error) {
+    } catch {
         toast.error("Network Error");
     }
   };
@@ -362,7 +224,7 @@ export default function InstancesPage() {
       } else {
         toast.error("Deletion Rejected");
       }
-    } catch (error) {
+    } catch {
         toast.error("Network Error");
     }
   };
@@ -406,10 +268,10 @@ export default function InstancesPage() {
       <ActivityDrawer isOpen={isActivityOpen} onClose={() => setIsActivityOpen(false)} jobs={jobs || []} />
       <CreateInstanceModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} token={token} initialType={createModalType} />
       <SnapshotDrawer isOpen={!!snapshotInstance} onClose={() => setSnapshotInstance(null)} instanceName={snapshotInstance} />
-      <NetworkDrawer isOpen={!!networkInstance} onClose={() => setNetworkInstance(null)} instance={metrics.find(m => m.name === networkInstance) || null} />
+      <NetworkDrawer isOpen={!!networkInstance} onClose={() => setNetworkInstance(null)} instance={networkInstance} />
       <FileExplorerDrawer isOpen={!!fileInstance} onClose={() => setFileInstance(null)} instanceName={fileInstance} />
       {terminalInstance && <WebTerminal instanceName={terminalInstance} onClose={() => setTerminalInstance(null)} />}
-      <BackupPolicyModal isOpen={!!backupPolicyInstance} onClose={() => setBackupPolicyInstance(null)} instanceName={backupPolicyInstance} token={token} />
+      <BackupPolicyModal isOpen={!!backupPolicyInstance} onClose={() => setBackupPolicyInstance(null)} instance={backupPolicyInstance} token={token} />
 
       <header className="mb-8">
         <div className="flex justify-between items-center mb-6">
@@ -547,13 +409,13 @@ export default function InstancesPage() {
                               <button onClick={() => { setFileInstance(inst.name); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 flex items-center gap-2">
                                   <FolderOpen size={14} /> Files
                               </button>
-                              <button onClick={() => { setNetworkInstance(inst.name); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 flex items-center gap-2">
+                              <button onClick={() => { setNetworkInstance(inst); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 flex items-center gap-2">
                                   <Network size={14} /> Network
                               </button>
                               <button onClick={() => { setSnapshotInstance(inst.name); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 flex items-center gap-2">
                                   <HardDrive size={14} /> Backups
                               </button>
-                              <button onClick={() => { setBackupPolicyInstance(inst.name); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 flex items-center gap-2">
+                              <button onClick={() => { setBackupPolicyInstance(inst); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 flex items-center gap-2">
                                   <ShieldCheck size={14} /> Backup Settings
                               </button>
                               <div className="h-px bg-zinc-800 my-1"></div>
@@ -603,7 +465,7 @@ export default function InstancesPage() {
                 </div>
                 <div className="bg-zinc-900/30 p-3 rounded-lg border border-zinc-800/50">
                   <div className="flex items-center gap-2 mb-1 text-zinc-500"><Cpu size={12} strokeWidth={1.5} /><span className="text-[10px] uppercase tracking-wider font-semibold">Memory</span></div>
-                  <p className="text-sm font-mono text-zinc-200">{formatBytes(inst.memory_usage_bytes)}</p>
+                  <p className="text-sm font-mono text-zinc-200">{formatBytes(inst.memory_usage_bytes).value} {formatBytes(inst.memory_usage_bytes).unit}</p>
                 </div>
               </div>
 

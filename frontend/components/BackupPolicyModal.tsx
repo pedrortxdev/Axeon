@@ -3,33 +3,46 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { X, ShieldCheck, Save, ChevronDown } from 'lucide-react';
+import { InstanceMetric } from '@/types';
 
 interface BackupPolicyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  instanceName: string | null;
+  instance: InstanceMetric | null;
   token: string | null;
 }
 
-export default function BackupPolicyModal({ isOpen, onClose, instanceName, token }: BackupPolicyModalProps) {
+export default function BackupPolicyModal({ isOpen, onClose, instance, token }: BackupPolicyModalProps) {
   const [enabled, setEnabled] = useState(false);
   const [schedule, setSchedule] = useState('@daily');
   const [retention, setRetention] = useState(7);
   const [customSchedule, setCustomSchedule] = useState('');
 
   useEffect(() => {
-    if (isOpen && instanceName) {
-      // You could fetch the current policy here if needed
-      // For now, we reset to defaults
-      setEnabled(false);
-      setSchedule('@daily');
-      setRetention(7);
-      setCustomSchedule('');
+    if (isOpen && instance) {
+      const backupInfo = instance.backup_info;
+      if (!backupInfo) return; // Add this check
+
+      // Update all state together to avoid cascading renders
+      setEnabled(backupInfo.enabled);
+      setRetention(backupInfo.retention || 7);
+
+      const isStandardSchedule = ['@daily', '@hourly', '@weekly'].includes(backupInfo.schedule);
+      if (isStandardSchedule) {
+        setSchedule(backupInfo.schedule);
+        setCustomSchedule('');
+      } else if (backupInfo.schedule) {
+        setSchedule('custom');
+        setCustomSchedule(backupInfo.schedule);
+      } else {
+        setSchedule('@daily');
+        setCustomSchedule('');
+      }
     }
-  }, [isOpen, instanceName]);
+  }, [isOpen, instance]);
 
   const handleSave = async () => {
-    if (!instanceName || !token) return;
+    if (!instance || !token) return;
 
     const finalSchedule = schedule === 'custom' ? customSchedule : schedule;
 
@@ -37,7 +50,7 @@ export default function BackupPolicyModal({ isOpen, onClose, instanceName, token
       const protocol = window.location.protocol;
       const host = window.location.hostname;
       const port = '8500';
-      const response = await fetch(`${protocol}//${host}:${port}/instances/${instanceName}/backups/config`, {
+      const response = await fetch(`${protocol}//${host}:${port}/instances/${instance.name}/backups/config`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,7 +70,7 @@ export default function BackupPolicyModal({ isOpen, onClose, instanceName, token
         const error = await response.json();
         toast.error('Failed to update policy', { description: error.error });
       }
-    } catch (error) {
+    } catch {
       toast.error('Network error while updating policy.');
     }
   };
@@ -75,7 +88,7 @@ export default function BackupPolicyModal({ isOpen, onClose, instanceName, token
             </div>
             <div>
               <h2 className="text-lg font-semibold text-zinc-100">Automatic Backup Policy</h2>
-              <p className="text-sm text-zinc-400">for {instanceName}</p>
+              <p className="text-sm text-zinc-400">for {instance?.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-full text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">

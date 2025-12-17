@@ -4,22 +4,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ClusterStatus from '@/components/ClusterStatus';
 import HostStatsCard from '@/components/HostStatsCard';
+import { HostStats } from '@/types';
 
 export default function OverviewPage() {
-  const [stats, setStats] = useState<any>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [stats, setStats] = useState<HostStats | null>(null);
+  const storedToken = typeof window !== 'undefined' ? localStorage.getItem('axion_token') : null;
+  const [token] = useState<string | null>(storedToken);
   const wsRef = useRef<WebSocket | null>(null);
   const router = useRouter();
 
   // --- Auth Check ---
   useEffect(() => {
-    const storedToken = localStorage.getItem('axion_token');
-    if (!storedToken) {
+    if (!token) {
         router.push('/login');
-    } else {
-        setToken(storedToken);
     }
-  }, [router]);
+  }, [router, token]);
 
   // --- WebSocket Logic ---
   useEffect(() => {

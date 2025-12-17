@@ -32,7 +32,7 @@ export default function LoginPage() {
       } else {
         toast.error('Invalid credentials');
       }
-    } catch (error) {
+    } catch {
       toast.error('Connection failed');
     } finally {
       setIsLoading(false);

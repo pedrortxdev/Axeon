@@ -62,11 +62,17 @@ export default function InstanceMetricsCharts({ instanceName, token }: InstanceM
     fetchMetrics();
   }, [instanceName, range, token]);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface CustomTooltipProps {
+    active?: boolean;
+    payload?: Array<{ value: number; name: string; dataKey: string; }>;
+    label?: string;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg p-3 text-sm shadow-lg">
-          <p className="label text-zinc-400">{`${new Date(label).toLocaleString()}`}</p>
+          <p className="label text-zinc-400">{`${new Date(label!).toLocaleString()}`}</p>
           {payload[0] && payload[0].value !== undefined && (
             <p className="intro text-indigo-400">{`Memory: ${formatBytes(payload[0].value)}`}</p>
           )}
@@ -93,7 +99,7 @@ export default function InstanceMetricsCharts({ instanceName, token }: InstanceM
             </div>
         ) : metrics.length === 0 ? (
              <div className="flex items-center justify-center h-full text-zinc-500">
-                No data available for this period.
+                Coletando dados...
             </div>
         ) : (
           <AreaChart data={metrics}>

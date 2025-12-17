@@ -26,10 +26,10 @@ backend_v2.log
 *.swo
 
 # Node
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/dist/
+node_modules/
+.next/
+out/
+dist/
 
 # Env
 .env

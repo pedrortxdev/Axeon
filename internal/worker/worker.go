@@ -151,6 +151,7 @@ func executeLogic(ctx context.Context, job *db.Job, lxcClient *lxc.InstanceServi
 				Limits   map[string]string `json:"limits"`
 				UserData string            `json:"user_data"` // Adicionado suporte a user_data
 				Type     string            `json:"type"`      // Instance type: "container" or "virtual-machine"
+				ISOPath  string            `json:"iso_path"`  // Caminho para ISO customizada (opcional)
 			}
 			if e := json.Unmarshal([]byte(job.Payload), &payload); e != nil {
 				err = fmt.Errorf("payload inválido: %v", e)
@@ -160,7 +161,13 @@ func executeLogic(ctx context.Context, job *db.Job, lxcClient *lxc.InstanceServi
 				if instanceType == "" {
 					instanceType = "container"
 				}
-				err = lxcClient.CreateInstance(payload.Name, payload.Image, instanceType, payload.Limits, payload.UserData)
+
+				// If ISOPath is provided, create VM with ISO boot
+				if payload.ISOPath != "" {
+					err = lxcClient.CreateInstanceWithISO(payload.Name, payload.Image, instanceType, payload.Limits, payload.UserData, payload.ISOPath)
+				} else {
+					err = lxcClient.CreateInstance(payload.Name, payload.Image, instanceType, payload.Limits, payload.UserData)
+				}
 			}
 
 		case types.JobTypeDeleteInstance:

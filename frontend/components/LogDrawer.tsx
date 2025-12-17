@@ -15,7 +15,7 @@ export default function LogDrawer({ instanceName, isOpen, onClose, token }: LogD
   const [log, setLog] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const fetchLogs = async () => {
+  const fetchLogs = React.useCallback(async () => {
     if (!instanceName || !token) return;
 
     setIsLoading(true);
@@ -23,7 +23,7 @@ export default function LogDrawer({ instanceName, isOpen, onClose, token }: LogD
       const protocol = window.location.protocol;
       const host = window.location.hostname;
       const port = '8500';
-      
+
       const response = await fetch(`${protocol}//${host}:${port}/instances/${instanceName}/logs`, {
         method: 'GET',
         headers: {
@@ -45,13 +45,13 @@ export default function LogDrawer({ instanceName, isOpen, onClose, token }: LogD
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [instanceName, token]);
 
   useEffect(() => {
     if (isOpen && instanceName) {
       fetchLogs();
     }
-  }, [isOpen, instanceName, token]);
+  }, [isOpen, instanceName, token, fetchLogs]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(log);

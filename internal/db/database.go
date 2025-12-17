@@ -179,6 +179,23 @@ func DeleteInstance(name string) error {
 	return err
 }
 
+// UpdateInstanceStatusAndLimits updates the limits (including IP addresses) of an instance in the database
+func UpdateInstanceStatusAndLimits(name string, limits map[string]string) error {
+	// Convert limits map back to JSON
+	limitsJSON, err := json.Marshal(limits)
+	if err != nil {
+		return fmt.Errorf("failed to marshal limits: %w", err)
+	}
+
+	query := `
+	UPDATE instances
+	SET limits = $1
+	WHERE name = $2
+	`
+	_, err = DB.Exec(query, string(limitsJSON), name)
+	return err
+}
+
 func RecoverStuckJobs() error {
 	// Resetar IN_PROGRESS antigos para PENDING
 	query := `
@@ -416,6 +433,11 @@ func GetInstanceWithBackupInfo(name string) (*types.Instance, error) {
 	instance, err := GetInstance(name)
 	if err != nil {
 		return nil, err
+	}
+
+	// Fix backup retention: if it's 0, set it to the default value of 7
+	if instance.BackupRetention == 0 {
+		instance.BackupRetention = 7
 	}
 
 	// Create and populate the backup info

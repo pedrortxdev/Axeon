@@ -13,10 +13,12 @@ export default function MainLayout({
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
     const token = localStorage.getItem('axion_token');
     if (!token) {
       router.push('/login');
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsMounted(true); // This is intentional to prevent SSR/CSR mismatch
     }
   }, [router]);
 

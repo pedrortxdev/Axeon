@@ -45,6 +45,7 @@ type CreateInstanceRequest struct {
 	UserData   string            `json:"user_data"`   // Opcional: Cloud-Init
 	Type       string            `json:"type"`        // Instance type: "container" or "virtual-machine"
 	TemplateID string            `json:"template_id"` // Opcional: ID do template a ser usado
+	ISOPath    string            `json:"iso_path"`    // Caminho para ISO customizada (opcional)
 }
 
 type SnapshotRequest struct {
@@ -176,6 +177,22 @@ func main() {
 
 				if !templateFound {
 					c.JSON(404, gin.H{"error": fmt.Sprintf("Template com ID %s não encontrado", req.TemplateID)})
+					return
+				}
+			}
+
+			// If ISOPath is provided, validate that the ISO exists
+			if req.ISOPath != "" {
+				storageService, err := service.NewStorageService()
+				if err != nil {
+					c.JSON(500, gin.H{"error": "Failed to initialize storage service"})
+					return
+				}
+
+				// Validate that the ISO file exists
+				isoPath := storageService.GetISOPath(filepath.Base(req.ISOPath))
+				if _, err := os.Stat(isoPath); os.IsNotExist(err) {
+					c.JSON(400, gin.H{"error": "Specified ISO file does not exist"})
 					return
 				}
 			}
@@ -604,6 +621,91 @@ func main() {
 				return
 			}
 			c.JSON(200, gin.H{"status": "deleted"})
+		})
+
+		// Storage - ISO uploads
+		protected.POST("/storage/isos", func(c *gin.Context) {
+			// Retrieve storage service or create a new one for this endpoint
+			storageService, err := service.NewStorageService()
+			if err != nil {
+				log.Printf("Error initializing storage service: %v", err)
+				c.JSON(500, gin.H{"error": "Failed to initialize storage service"})
+				return
+			}
+
+			// Get file from multipart form
+			file, header, err := c.Request.FormFile("iso_file")
+			if err != nil {
+				c.JSON(400, gin.H{"error": "ISO file is required"})
+				return
+			}
+			defer file.Close()
+
+			// Validate file extension
+			filename := header.Filename
+			if !strings.HasSuffix(strings.ToLower(filename), ".iso") {
+				c.JSON(400, gin.H{"error": "Only .iso files are allowed"})
+				return
+			}
+
+			// Save ISO file using streaming
+			filePath, err := storageService.SaveISOFromReader(filename, file)
+			if err != nil {
+				log.Printf("Error saving ISO file: %v", err)
+				c.JSON(500, gin.H{"error": "Failed to save ISO file", "details": err.Error()})
+				return
+			}
+
+			isoName := filepath.Base(filePath)
+			c.JSON(200, gin.H{
+				"status": "success",
+				"iso_name": isoName,
+				"iso_path": filePath,
+			})
+		})
+
+		// List uploaded ISOs
+		protected.GET("/storage/isos", func(c *gin.Context) {
+			storageService, err := service.NewStorageService()
+			if err != nil {
+				log.Printf("Error initializing storage service: %v", err)
+				c.JSON(500, gin.H{"error": "Failed to initialize storage service"})
+				return
+			}
+
+			isos, err := storageService.ListISOs()
+			if err != nil {
+				log.Printf("Error listing ISOs: %v", err)
+				c.JSON(500, gin.H{"error": "Failed to list ISOs", "details": err.Error()})
+				return
+			}
+
+			c.JSON(200, gin.H{
+				"isos": isos,
+			})
+		})
+
+		// Delete an ISO
+		protected.DELETE("/storage/isos/:name", func(c *gin.Context) {
+			name := c.Param("name")
+
+			storageService, err := service.NewStorageService()
+			if err != nil {
+				log.Printf("Error initializing storage service: %v", err)
+				c.JSON(500, gin.H{"error": "Failed to initialize storage service"})
+				return
+			}
+
+			err = storageService.DeleteISO(name)
+			if err != nil {
+				log.Printf("Error deleting ISO %s: %v", name, err)
+				c.JSON(500, gin.H{"error": "Failed to delete ISO", "details": err.Error()})
+				return
+			}
+
+			c.JSON(200, gin.H{
+				"status": "deleted",
+			})
 		})
 
 		// Cluster members endpoint

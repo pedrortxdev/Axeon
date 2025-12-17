@@ -29,13 +29,7 @@ export default function FileExplorerDrawer({ isOpen, onClose, instanceName }: Fi
   // Upload Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isOpen && instanceName) {
-      fetchFiles(currentPath);
-    }
-  }, [isOpen, instanceName, currentPath]);
-
-  const fetchFiles = async (path: string) => {
+  const fetchFiles = React.useCallback(async (path: string) => {
     if (!instanceName) return;
     setLoading(true);
     try {
@@ -71,7 +65,13 @@ export default function FileExplorerDrawer({ isOpen, onClose, instanceName }: Fi
     } finally {
       setLoading(false);
     }
-  };
+  }, [instanceName]);
+
+  useEffect(() => {
+    if (isOpen && instanceName) {
+      fetchFiles(currentPath);
+    }
+  }, [isOpen, instanceName, currentPath, fetchFiles]);
 
   const handleEntryClick = async (entry: FileEntry) => {
     const fullPath = currentPath === '/' ? `/${entry.name}` : `${currentPath}/${entry.name}`;

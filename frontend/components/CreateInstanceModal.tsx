@@ -101,15 +101,8 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
         setSelectedTemplate(null);
     }
   }, [isOpen, initialType]);
-
-  // Fetch templates when modal opens
-  useEffect(() => {
-    if (isOpen && activeTab === 'templates') {
-      fetchTemplates();
-    }
-  }, [isOpen, activeTab]);
-
-  const fetchTemplates = async () => {
+  
+  const fetchTemplates = React.useCallback(async () => {
     if (!token) return;
 
     setLoadingTemplates(true);
@@ -134,14 +127,16 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
     } finally {
       setLoadingTemplates(false);
     }
-  };
+  }, [token]);
 
-  // Update user data when relevant fields change
+  // Fetch templates when modal opens
   useEffect(() => {
-    generateUserData();
-  }, [type, templateId, username, password]);
+    if (isOpen && activeTab === 'templates') {
+      fetchTemplates();
+    }
+  }, [isOpen, activeTab, fetchTemplates]);
 
-  const generateUserData = () => {
+  const generateUserData = React.useCallback(() => {
     // Use selected template if one is selected, otherwise use legacy templates
     let templateYaml = '';
 
@@ -153,7 +148,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
       templateYaml = LEGACY_TEMPLATES.find(t => t.id === templateId)?.yaml || '';
     }
 
-    let yamlLines = ['#cloud-config'];
+    const yamlLines = ['#cloud-config'];
 
     // 1. User Configuration (VM Only)
     if (type === 'virtual-machine' && username && password) {
@@ -214,7 +209,12 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
     }
 
     setUserData(yamlLines.join('\n'));
-  };
+  }, [type, templateId, username, password, selectedTemplate]);
+
+  // Update user data when relevant fields change
+  useEffect(() => {
+    generateUserData();
+  }, [generateUserData]);
 
   if (!isOpen) return null;
 
@@ -261,7 +261,9 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
       const protocol = window.location.protocol;
       const host = window.location.hostname;
       const port = '8500';
-      const payload: any = {
+
+      // Define payload with proper type
+      let payload: any = {
         name: name.trim(),
         type: type,
         image: image,

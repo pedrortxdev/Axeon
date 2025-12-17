@@ -3,6 +3,8 @@
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
 
 interface WebTerminalProps {
   instanceName: string;
@@ -13,12 +15,12 @@ export default function WebTerminal({ instanceName, onClose }: WebTerminalProps)
   const terminalRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   // Refs para as instâncias do xterm e fit addon para limpeza
-  const xtermInstance = useRef<any>(null); 
-  const fitAddonInstance = useRef<any>(null);
+  const xtermInstance = useRef<Terminal | null>(null); 
+  const fitAddonInstance = useRef<FitAddon | null>(null);
 
   useEffect(() => {
-    let term: any;
-    let fitAddon: any;
+    let term: Terminal;
+    let fitAddon: FitAddon;
     let socket: WebSocket;
 
     const initTerminal = async () => {

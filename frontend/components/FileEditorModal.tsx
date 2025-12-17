@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { X, Save, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Monaco } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 
 interface FileEditorModalProps {
   isOpen: boolean;
@@ -74,11 +76,15 @@ export default function FileEditorModal({ isOpen, onClose, instanceName, filePat
       if (res.ok) {
         toast.success(`Saved ${filePath}`);
       } else {
-        const err = await res.json();
+        const err: { error?: string } = await res.json();
         toast.error("Save Failed", { description: err.error });
       }
-    } catch (error) {
-      toast.error("Network Error");
+    } catch (error: unknown) { // Changed error: any to error: unknown
+      let errorMessage = "Network Error";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast.error("Network Error", { description: errorMessage });
     } finally {
       setSaving(false);
     }
@@ -94,7 +100,7 @@ export default function FileEditorModal({ isOpen, onClose, instanceName, filePat
     window.open(url, '_blank');
   };
 
-  const handleEditorDidMount = (editor: any, monaco: any) => {
+  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       handleSave();
     });

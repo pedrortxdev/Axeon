@@ -1,14 +1,33 @@
-'use client';
-
 import React from 'react';
-import { ShieldCheck, ShieldAlert, Clock, Calendar, Settings } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
-import { InstanceMetric } from '@/types';
+import { ShieldCheck, ShieldAlert, Calendar, Settings, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { format, isToday, isTomorrow } from 'date-fns';
+import { InstanceMetric, InstanceBackupInfo } from '@/types';
 
 interface BackupHealthCardProps {
   instance: InstanceMetric;
   onConfigureBackup: () => void;
 }
+
+interface LastRunStatusProps {
+    backupInfo: InstanceBackupInfo;
+}
+
+const LastRunStatus: React.FC<LastRunStatusProps> = ({ backupInfo }) => {
+    if (!backupInfo.last_status) {
+      return <span className="text-zinc-400">Never</span>;
+    }
+
+    const status = backupInfo.last_status.toUpperCase();
+    
+    if (status === 'COMPLETED') {
+        return <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 size={14}/> {status}</span>;
+    }
+    if (status === 'FAILED') {
+        return <span className="flex items-center gap-1.5 text-red-400"><AlertTriangle size={14}/> {status}</span>;
+    }
+    
+    return <span className="text-yellow-400">{status}</span>;
+};
 
 const BackupHealthCard: React.FC<BackupHealthCardProps> = ({ 
   instance, 
@@ -16,8 +35,8 @@ const BackupHealthCard: React.FC<BackupHealthCardProps> = ({
 }) => {
   const { backup_info } = instance;
 
-  // If backup is not enabled, show not protected state
-  if (!backup_info?.enabled) {
+  // If backup_info is not available, show not protected state
+  if (!backup_info) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
@@ -38,78 +57,71 @@ const BackupHealthCard: React.FC<BackupHealthCardProps> = ({
     );
   }
 
-  // Calculate status badge color based on last_status
-  const getStatusBadgeClass = () => {
-    if (!backup_info.last_status) {
-      return 'bg-zinc-700 text-zinc-300'; // Not run yet
+  const formatNextRun = (nextRun: string) => {
+    const date = new Date(nextRun);
+    if (isToday(date)) {
+      return `Today at ${format(date, 'HH:mm')}`;
     }
-
-    switch (backup_info.last_status && typeof backup_info.last_status === 'string' ? backup_info.last_status.toLowerCase() : '') {
-      case 'completed':
-        return 'bg-emerald-500/20 text-emerald-400';
-      case 'failed':
-        return 'bg-red-500/20 text-red-400';
-      case 'in_progress':
-        return 'bg-blue-500/20 text-blue-400';
-      case 'canceled':
-        return 'bg-yellow-500/20 text-yellow-400';
-      default:
-        return 'bg-zinc-700 text-zinc-300';
+    if (isTomorrow(date)) {
+      return `Tomorrow at ${format(date, 'HH:mm')}`;
     }
-  };
-
-  // Format schedule display
-  const formatSchedule = (schedule: string) => {
-    if (schedule === '@daily') return 'Daily (@daily)';
-    if (schedule === '@weekly') return 'Weekly (@weekly)';
-    if (schedule === '@monthly') return 'Monthly (@monthly)';
-    return schedule; // Show raw cron string if not a standard alias
+    return format(date, 'MMM d, yyyy \'at\' HH:mm');
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <ShieldCheck className="text-emerald-400" size={20} />
-        <h3 className="font-semibold text-zinc-100">Data Protection</h3>
+    <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-5 shadow-md">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3">
+          {backup_info.enabled ? (
+            <ShieldCheck className="text-emerald-400" size={22} />
+          ) : (
+            <ShieldAlert className="text-yellow-500" size={22} />
+          )}
+          <h3 className="font-semibold text-zinc-100 text-lg">Data Protection</h3>
+        </div>
+         <button
+            onClick={onConfigureBackup}
+            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700/80 text-zinc-300 rounded-md flex items-center gap-2 text-xs transition-colors border border-zinc-700"
+          >
+            <Settings size={14} />
+            Configure
+        </button>
       </div>
       
-      <div className="space-y-3">
-        {/* Status */}
+      <div className="space-y-3.5 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-zinc-400">Status</span>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass()}`}>
-            {backup_info.last_status || 'Never Run'}
-          </span>
+          <span className="text-zinc-400">Status</span>
+          {backup_info.enabled ? (
+            <span className="font-medium text-emerald-400">Active</span>
+          ) : (
+            <span className="font-medium text-zinc-400">Disabled</span>
+          )}
         </div>
 
-        {/* Schedule */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-zinc-400">Schedule</span>
-          <span className="text-sm text-zinc-300">{formatSchedule(backup_info.schedule)}</span>
-        </div>
-
-        {/* Last Backup */}
-        {backup_info.last_run && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-400">Last Backup</span>
-            <span className="text-sm text-zinc-300 flex items-center gap-1">
-              <Clock size={12} />
-              {formatDistanceToNow(new Date(backup_info.last_run), { addSuffix: true })}
-            </span>
-          </div>
-        )}
-
-        {/* Next Backup */}
-        {backup_info.next_run && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-400">Next Backup</span>
-            <span className="text-sm text-zinc-300 flex items-center gap-1">
-              <Calendar size={12} />
-              in {formatDistanceToNow(new Date(backup_info.next_run))}
-            </span>
-          </div>
+        {backup_info.enabled && (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-400">Next Run</span>
+              <span className="font-medium text-zinc-200 flex items-center gap-2">
+                <Calendar size={14} />
+                {backup_info.next_run ? formatNextRun(backup_info.next_run) : 'N/A'}
+              </span>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-400">Last Run</span>
+              <div className="font-medium text-zinc-200">
+                <LastRunStatus backupInfo={backup_info} />
+              </div>
+            </div>
+          </>
         )}
       </div>
+       {!backup_info.enabled && (
+         <div className="text-center mt-5 pt-4 border-t border-zinc-800">
+            <p className="text-zinc-500 text-xs">Automatic backups are disabled for this instance.</p>
+        </div>
+      )}
     </div>
   );
 };

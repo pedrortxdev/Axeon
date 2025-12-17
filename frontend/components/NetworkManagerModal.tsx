@@ -28,7 +28,7 @@ export default function NetworkManagerModal({ isOpen, onClose, token }: NetworkM
   const [newNetworkDescription, setNewNetworkDescription] = useState<string>('');
   const [newNetworkSubnet, setNewNetworkSubnet] = useState<string>('10.100.0.1/24');
 
-  const fetchNetworks = async () => {
+  const fetchNetworks = React.useCallback(async () => {
     if (!token) return;
 
     setIsLoading(true);
@@ -36,7 +36,7 @@ export default function NetworkManagerModal({ isOpen, onClose, token }: NetworkM
       const protocol = window.location.protocol;
       const host = window.location.hostname;
       const port = '8500';
-      
+
       const response = await fetch(`${protocol}//${host}:${port}/networks`, {
         method: 'GET',
         headers: {
@@ -58,7 +58,7 @@ export default function NetworkManagerModal({ isOpen, onClose, token }: NetworkM
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
   const createNetwork = async () => {
     if (!token) return;
@@ -139,7 +139,7 @@ export default function NetworkManagerModal({ isOpen, onClose, token }: NetworkM
     if (isOpen) {
       fetchNetworks();
     }
-  }, [isOpen, token]);
+  }, [isOpen, token, fetchNetworks]);
 
   if (!isOpen) return null;
 

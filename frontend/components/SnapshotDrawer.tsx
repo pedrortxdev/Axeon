@@ -23,17 +23,7 @@ export default function SnapshotDrawer({ isOpen, onClose, instanceName }: Snapsh
   const [creating, setCreating] = useState(false);
   const [newSnapName, setNewSnapName] = useState('');
 
-  // Generate default name when opening
-  useEffect(() => {
-    if (isOpen) {
-      const now = new Date();
-      const defaultName = `snap-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${now.getHours()}${now.getMinutes()}`;
-      setNewSnapName(defaultName);
-      fetchSnapshots();
-    }
-  }, [isOpen, instanceName]);
-
-  const fetchSnapshots = async () => {
+  const fetchSnapshots = React.useCallback(async () => {
     if (!instanceName) return;
     setLoading(true);
     try {
@@ -49,7 +39,7 @@ export default function SnapshotDrawer({ isOpen, onClose, instanceName }: Snapsh
       if (res.ok) {
         const data = await res.json();
         // LXD returns snapshots with full names like "container/snap0", we want just the snapshot name
-        const cleanSnaps = data.map((s: any) => ({
+        const cleanSnaps = data.map((s: Snapshot) => ({
             ...s,
             name: s.name.split('/').pop() || s.name
         }));
@@ -62,7 +52,17 @@ export default function SnapshotDrawer({ isOpen, onClose, instanceName }: Snapsh
     } finally {
       setLoading(false);
     }
-  };
+  }, [instanceName]);
+
+  // Generate default name when opening
+  useEffect(() => {
+    if (isOpen) {
+      const now = new Date();
+      const defaultName = `snap-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${now.getHours()}${now.getMinutes()}`;
+      setNewSnapName(defaultName);
+      fetchSnapshots();
+    }
+  }, [isOpen, instanceName, fetchSnapshots]);
 
   const handleCreate = async () => {
     if (!instanceName || !newSnapName) return;
