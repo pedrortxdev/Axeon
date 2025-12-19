@@ -146,11 +146,14 @@ sudo usermod -a -G lxd $USER
 sudo apt install postgresql postgresql-contrib
 
 # Configure um banco de dados e usuário para o Axion
-sudo -u postgres psql
-CREATE DATABASE axion;
-CREATE USER axion_user WITH PASSWORD 'axion_password';
-GRANT ALL PRIVILEGES ON DATABASE axion TO axion_user;
-\q
+# 1. Garanta que o banco está rodando
+sudo service postgresql start
+
+# 2. Crie o usuário 'axion' 
+sudo -u postgres psql -c "CREATE USER axion WITH PASSWORD 'axion_password' SUPERUSER;" || true
+
+# 3. Crie o banco 'axion_db' 
+sudo -u postgres psql -c "CREATE DATABASE axion_db OWNER axion;" || true
 ```
 
 ### Instalação e Execução
