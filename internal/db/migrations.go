@@ -101,6 +101,24 @@ var migrations = []Migration{
 		`,
 		Down: `DROP TABLE IF EXISTS schema_migrations CASCADE;`,
 	},
+	{
+		Version:     5,
+		Description: "Create branding settings table",
+		Up: `
+			CREATE TABLE IF NOT EXISTS branding_settings (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER UNIQUE NOT NULL,
+				logo_url VARCHAR(500),
+				primary_color VARCHAR(7) DEFAULT '#3B82F6',
+				hide_powered_by BOOLEAN DEFAULT FALSE,
+				created_at TIMESTAMP DEFAULT NOW(),
+				updated_at TIMESTAMP DEFAULT NOW()
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_branding_user_id ON branding_settings(user_id);
+		`,
+		Down: `DROP TABLE IF EXISTS branding_settings CASCADE;`,
+	},
 }
 
 // ============================================================================

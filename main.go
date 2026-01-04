@@ -1116,12 +1116,20 @@ func (a *Application) setupRouter() {
 		api.TerminalHandler(c, a.lxcClient)
 	})
 
+
+	// Static uploads
+	r.Static("/uploads", "./uploads")
+
 	// Protected routes
 	protected := r.Group("/")
 	protected.Use(auth.AuthMiddleware())
 	{
+		// Branding
+		api.RegisterBrandingRoutes(protected)
+
 		// Instances
 		protected.GET("/instances", a.handlers.ListInstances)
+
 		protected.GET("/instances/:name", a.handlers.GetInstance)
 		protected.POST("/instances", a.handlers.CreateInstance)
 		protected.DELETE("/instances/:name", a.handlers.DeleteInstance)
