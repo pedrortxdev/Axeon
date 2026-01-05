@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"time"
 
 	"aexon/internal/provider/axhv/pb"
@@ -32,29 +31,29 @@ func NewClient(socketPath string, tcpAddress string, token string) (*Client, err
 		if token != "" {
 			opts = append(opts, grpc.WithPerRPCCredentials(&tokenAuth{token: token}))
 		}
-		log.Printf("[AxHV Client] Connecting via TCP to %s", target)
+		log.Printf("[AxHV Client] Configured for TCP: %s", target)
 	} else {
 		// Unix Socket Mode (Local)
 		if socketPath == "" {
 			socketPath = "/tmp/axhv.sock"
 		}
+
+		// Native gRPC Unix socket: unix:// + absolute path
 		target = "unix://" + socketPath
 
-		// Custom dialer for Unix socket
-		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
-			return net.Dial("unix", socketPath) // Ignore addr in dialer, use socketPath directly
-		}
-		opts = append(opts, grpc.WithContextDialer(dialer))
-		log.Printf("[AxHV Client] Connecting via Unix Socket to %s", socketPath)
+		log.Printf("[AxHV Client] Configured for Unix Socket: %s", target)
 	}
 
-	// Connect with timeout
+	// Connection timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// WithBlock ensures we actually connect before returning
+	opts = append(opts, grpc.WithBlock())
+
 	conn, err := grpc.DialContext(ctx, target, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to AxHV daemon: %w", err)
+		return nil, fmt.Errorf("FATAL: Could not connect to AxHV at %s: %w", target, err)
 	}
 
 	client := pb.NewVmServiceClient(conn)
@@ -107,7 +106,7 @@ func (c *Client) ListVms(ctx context.Context) (*pb.ListVmsResponse, error) {
 }
 
 func (c *Client) GetVmStats(ctx context.Context, id string) (*pb.VmStatsResponse, error) {
-	return c.service.GetVmStats(ctx, &pb.VmIdRequest{Id: id})
+	return c.service.GetVmStats(ctx, &pb.GetVmStatsRequest{Id: id, TapName: "axhv-" + id})
 }
 
 func (c *Client) RebootVm(ctx context.Context, id string) (*pb.VmResponse, error) {

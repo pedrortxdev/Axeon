@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { ShieldCheck, Server, Globe, Lock, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShieldCheck, Server, Globe, Lock, Plus, Trash2, MousePointerClick } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import CreateNetworkModal from '../../../components/CreateNetworkModal';
 
@@ -17,6 +18,7 @@ interface NetworkPool {
 }
 
 export default function NetworksPage() {
+  const router = useRouter();
   const [pools, setPools] = useState<NetworkPool[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,6 +55,33 @@ export default function NetworksPage() {
     fetchNetworks();
   }, [fetchNetworks]);
 
+  const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation(); // Prevent card click
+    if (!confirm(`Are you sure you want to delete network "${name}"? This action cannot be undone.`)) return;
+
+    try {
+      const protocol = window.location.protocol;
+      const host = window.location.hostname;
+      const port = '8500';
+      const token = localStorage.getItem('axion_token');
+
+      const res = await fetch(`${protocol}//${host}:${port}/api/v1/networks/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast.success(`Network "${name}" deleted`);
+        fetchNetworks();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to delete network");
+      }
+    } catch (error) {
+      toast.error("Connection failed");
+    }
+  };
+
   return (
     <div className="p-6 space-y-8">
       <Toaster position="top-right" theme="dark" />
@@ -82,12 +111,16 @@ export default function NetworksPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pools.map(pool => (
-            <div key={pool.id} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 shadow-lg backdrop-blur-sm hover:border-zinc-700 transition-all">
+            <div
+              key={pool.id}
+              onClick={() => router.push(`/networks/${pool.id}`)}
+              className="group cursor-pointer bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 shadow-lg backdrop-blur-sm hover:border-zinc-700 hover:bg-zinc-900 transition-all relative"
+            >
 
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="font-semibold text-lg text-zinc-100 flex items-center gap-2">
+                  <h3 className="font-semibold text-lg text-zinc-100 flex items-center gap-2 group-hover:text-indigo-400 transition-colors">
                     {pool.name}
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
@@ -96,15 +129,27 @@ export default function NetworksPage() {
                     </span>
                   </div>
                 </div>
-                {pool.is_public ? (
-                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                    <Globe size={12} /> PUBLIC
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <Lock size={12} /> PRIVATE
-                  </span>
-                )}
+
+                <div className="flex items-center gap-2">
+                  {pool.is_public ? (
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <Globe size={12} /> PUBLIC
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <Lock size={12} /> PRIVATE
+                    </span>
+                  )}
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => handleDelete(e, pool.id, pool.name)}
+                    className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                    title="Delete Network"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Progress Bar */}

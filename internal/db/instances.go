@@ -56,10 +56,12 @@ func (r *InstanceRepository) Create(ctx context.Context, instance *types.Instanc
 
 func (r *InstanceRepository) Get(ctx context.Context, name string) (*types.Instance, error) {
 	query := `
-		SELECT name, image, limits, user_data, type,
-		       backup_schedule, backup_retention, backup_enabled
-		FROM instances
-		WHERE name = $1
+		SELECT i.name, i.image, i.limits, i.user_data, i.type,
+		       i.backup_schedule, i.backup_retention, i.backup_enabled,
+		       COALESCE(l.ip, '') as ip_address
+		FROM instances i
+		LEFT JOIN ip_leases l ON l.instance_name = i.name
+		WHERE i.name = $1
 	`
 
 	row := r.db.QueryRowContext(ctx, query, name)
@@ -76,6 +78,7 @@ func (r *InstanceRepository) Get(ctx context.Context, name string) (*types.Insta
 		&instance.BackupSchedule,
 		&instance.BackupRetention,
 		&instance.BackupEnabled,
+		&instance.IpAddress, // Fetch IP
 	)
 
 	if err != nil {
@@ -94,15 +97,20 @@ func (r *InstanceRepository) Get(ctx context.Context, name string) (*types.Insta
 		instance.BackupRetention = 7
 	}
 
+	// Default status
+	instance.Status = "UNKNOWN"
+
 	return &instance, nil
 }
 
 func (r *InstanceRepository) List(ctx context.Context) ([]types.Instance, error) {
 	query := `
-		SELECT name, image, limits, user_data, type,
-		       backup_schedule, backup_retention, backup_enabled
-		FROM instances
-		ORDER BY name
+		SELECT i.name, i.image, i.limits, i.user_data, i.type,
+		       i.backup_schedule, i.backup_retention, i.backup_enabled,
+		       COALESCE(l.ip, '') as ip_address
+		FROM instances i
+		LEFT JOIN ip_leases l ON l.instance_name = i.name
+		ORDER BY i.name
 	`
 
 	rows, err := r.db.QueryContext(ctx, query)
@@ -126,6 +134,7 @@ func (r *InstanceRepository) List(ctx context.Context) ([]types.Instance, error)
 			&instance.BackupSchedule,
 			&instance.BackupRetention,
 			&instance.BackupEnabled,
+			&instance.IpAddress,
 		)
 
 		if err != nil {
@@ -141,6 +150,9 @@ func (r *InstanceRepository) List(ctx context.Context) ([]types.Instance, error)
 		if instance.BackupRetention == 0 {
 			instance.BackupRetention = 7
 		}
+
+		// Default status (we'll update this with real AxHV status in ListInstances handler)
+		instance.Status = "UNKNOWN"
 
 		instances = append(instances, instance)
 	}

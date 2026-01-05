@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -156,6 +157,7 @@ type CreateInstanceRequest struct {
 	Type       string            `json:"type"`
 	TemplateID string            `json:"template_id"`
 	ISOImage   string            `json:"iso_image"`
+	NetworkID  string            `json:"network_id"`
 }
 
 type SnapshotRequest struct {
@@ -291,8 +293,6 @@ func (h *Handlers) writeError(c *gin.Context, appErr *AppError) {
 func (h *Handlers) GetInstance(c *gin.Context) {
 	name := c.Param("name")
 
-	// We no longer enrich via LXD here because AxHV is simpler.
-	// Just return DB instance. If we need stats, we use GetVmStats separate call.
 	instance, err := db.GetInstance(name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -304,7 +304,67 @@ func (h *Handlers) GetInstance(c *gin.Context) {
 		return
 	}
 
+	// 1. Get live status from AxHV
+	instance.Status = "STOPPED" // Default
+	if h.axhvClient != nil {
+		// Use ListVms to check if running (efficient enough for now)
+		axhvVMs, err := h.axhvClient.ListVms(c.Request.Context())
+		if err == nil && axhvVMs != nil {
+			for _, vm := range axhvVMs.Vms {
+				if vm.Id == instance.Name {
+					instance.Status = "RUNNING"
+					break
+				}
+			}
+		}
+	}
+
+	// 2. Populate Hardware Specs from Limits (for frontend simplicity)
+	// Limits map example: {"limits.cpu": "1", "limits.memory": "512MB", "limits.disk": "10GB"}
+	// We handle standard keys
+	if val, ok := instance.Limits["limits.cpu"]; ok {
+		if cpu, err := strconv.Atoi(val); err == nil {
+			instance.CPUCount = cpu
+		}
+	} else if val, ok := instance.Limits["cpu"]; ok { // Fallback basic key
+		if cpu, err := strconv.Atoi(val); err == nil {
+			instance.CPUCount = cpu
+		}
+	}
+
+	// Disk limit parsing (simplified)
+	if val, ok := instance.Limits["limits.disk"]; ok {
+		// Expect "10GB" -> 10 * 1024 * 1024 * 1024
+		instance.DiskLimit = parseSizeToBytes(val)
+	}
+
+	// Ensure IP is set (fetched from DB join now)
+	// Gateway is hardcoded for MVP
+	// We can inject "guest_gateway" into limits or a specific field if needed,
+	// but frontend can also infer it (x.1). For now let's just return what we have.
+
 	c.JSON(200, instance)
+}
+
+func parseSizeToBytes(s string) int64 {
+	// Very basic parser for MVP
+	s = strings.ToUpper(strings.TrimSpace(s))
+	multiplier := int64(1)
+	if strings.HasSuffix(s, "GB") {
+		multiplier = 1024 * 1024 * 1024
+		s = strings.TrimSuffix(s, "GB")
+	} else if strings.HasSuffix(s, "MB") {
+		multiplier = 1024 * 1024
+		s = strings.TrimSuffix(s, "MB")
+	} else if strings.HasSuffix(s, "KB") {
+		multiplier = 1024
+		s = strings.TrimSuffix(s, "KB")
+	} else if strings.HasSuffix(s, "B") {
+		s = strings.TrimSuffix(s, "B")
+	}
+
+	val, _ := strconv.ParseInt(s, 10, 64)
+	return val * multiplier
 }
 
 func (h *Handlers) ListInstances(c *gin.Context) {
@@ -314,6 +374,27 @@ func (h *Handlers) ListInstances(c *gin.Context) {
 		h.writeError(c, ErrDatabaseFailure(err))
 		return
 	}
+
+	// Get live status from AxHV daemon
+	if h.axhvClient != nil {
+		axhvVMs, err := h.axhvClient.ListVms(c.Request.Context())
+		if err == nil && axhvVMs != nil {
+			// Build a map of running VMs
+			runningVMs := make(map[string]bool)
+			for _, vm := range axhvVMs.Vms {
+				runningVMs[vm.Id] = true
+			}
+			// Update instance statuses
+			for i := range instances {
+				if runningVMs[instances[i].Name] {
+					instances[i].Status = "RUNNING"
+				} else {
+					instances[i].Status = "STOPPED"
+				}
+			}
+		}
+	}
+
 	c.JSON(200, instances)
 }
 
@@ -332,7 +413,15 @@ func (h *Handlers) CreateInstance(c *gin.Context) {
 	}
 
 	// Allocate IP using DB locking (IPAM)
-	ip, err := db.GetService().AllocateIP(c.Request.Context(), req.Name)
+	var ip string
+	var err error
+
+	if req.NetworkID != "" {
+		ip, err = db.GetService().AllocateInNetwork(c.Request.Context(), req.NetworkID, req.Name)
+	} else {
+		ip, err = db.GetService().AllocateIP(c.Request.Context(), req.Name)
+	}
+
 	if err != nil {
 		log.Printf("IP Allocation failed for %s: %v", req.Name, err)
 		h.writeError(c, NewError(ErrCodeInstanceCreationFailed, "failed to allocate IP", err, 500, false))
@@ -369,8 +458,10 @@ func (h *Handlers) CreateInstance(c *gin.Context) {
 	}
 
 	// Call AxHV gRPC
+	log.Printf("[DEBUG] Calling AxHV CreateVm with: ID=%s, Kernel=%s, Rootfs=%s, IP=%s", pbReq.Id, pbReq.KernelPath, pbReq.RootfsPath, pbReq.GuestIp)
 	grpcResp, err := h.axhvClient.CreateVm(c.Request.Context(), pbReq)
 	if err != nil {
+		log.Printf("[ERROR] AxHV CreateVm failed: %v", err)
 		h.writeError(c, NewError(ErrCodeInstanceCreationFailed, "AxHV RPC failed", err, 502, true))
 		return
 	}
@@ -573,14 +664,25 @@ func (h *Handlers) GetInstanceMetrics(c *gin.Context) {
 	stats, err := h.axhvClient.GetVmStats(c.Request.Context(), name)
 	if err != nil {
 		log.Printf("Error fetching metrics for %s: %v", name, err)
-		h.writeError(c, NewError(ErrCodeMetricsFetchFailed, "failed to fetch metrics", err, 500, true))
+		// Return zeros if VM is stopped or metrics unavailable
+		c.JSON(200, gin.H{
+			"cpu_usage_us":         0,
+			"memory_used_bytes":    0,
+			"net_rx_bytes":         0,
+			"net_tx_bytes":         0,
+			"disk_allocated_bytes": 0,
+		})
 		return
 	}
 
-	// Calculate rates if needed, or pass raw. The frontend expects similar structure to LXD?
-	// The requested requirement: "Implement Metrics endpoint (gRPC GetVmStats -> HTTP)"
-
-	c.JSON(200, stats)
+	// Return explicit JSON with snake_case field names
+	c.JSON(200, gin.H{
+		"cpu_usage_us":         stats.CpuUsageUs,
+		"memory_used_bytes":    stats.MemoryUsedBytes,
+		"net_rx_bytes":         stats.NetRxBytes,
+		"net_tx_bytes":         stats.NetTxBytes,
+		"disk_allocated_bytes": stats.DiskAllocatedBytes,
+	})
 }
 
 func (h *Handlers) GetInstanceMetricsHistory(c *gin.Context) {
@@ -910,6 +1012,8 @@ func (a *Application) setupRouter() {
 	// Admin Networks
 	api.GET("/networks", auth.AuthMiddleware(), h.ListNetworks)
 	api.POST("/networks", auth.AuthMiddleware(), h.CreateNetwork)
+	api.GET("/networks/:id", auth.AuthMiddleware(), h.GetNetwork)
+	api.DELETE("/networks/:id", auth.AuthMiddleware(), h.DeleteNetwork)
 }
 
 func (a *Application) Start() error {
@@ -1043,6 +1147,41 @@ func (h *Handlers) CreateNetwork(c *gin.Context) {
 	}
 
 	c.JSON(201, gin.H{"status": "created"})
+}
+
+func (h *Handlers) GetNetwork(c *gin.Context) {
+	id := c.Param("id")
+	details, err := db.GetService().GetNetworkDetails(c.Request.Context(), id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(404, gin.H{"error": "Network not found"})
+			return
+		}
+		c.JSON(500, gin.H{"error": "Failed to fetch network details", "details": err.Error()})
+		return
+	}
+	c.JSON(200, details)
+}
+
+func (h *Handlers) DeleteNetwork(c *gin.Context) {
+	id := c.Param("id")
+	err := db.GetService().DeleteNetwork(c.Request.Context(), id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(404, gin.H{"error": "Network not found"})
+			return
+		}
+		// Check for specific error string "active IP allocations"
+		// Ideally use custom error types, but string matching is fast for now
+		if err.Error() == "network has active IP allocations" ||
+			(len(err.Error()) > 10 && err.Error()[:11] == "network has") {
+			c.JSON(409, gin.H{"error": err.Error()}) // Conflict
+			return
+		}
+		c.JSON(500, gin.H{"error": "Failed to delete network", "details": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"status": "deleted"})
 }
 
 // ============================================================================

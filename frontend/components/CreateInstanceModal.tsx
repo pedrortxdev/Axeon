@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Server, Box, Zap, FileCode, Code, Loader2, Monitor, User, Key, Network, FileUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { NetworkSelector } from './NetworkSelector';
 
 interface Template {
   id: string;
@@ -87,6 +88,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
   const [installMethod, setInstallMethod] = useState<'template' | 'iso'>('template');
   const [isoImages, setIsoImages] = useState<IsoImage[]>([]);
   const [selectedIso, setSelectedIso] = useState<string>('');
+  const [networkId, setNetworkId] = useState('');
 
   // Port Forwarding State
   const [ports, setPorts] = useState<{ ext: number; int: number }[]>([{ ext: 0, int: 22 }]);
@@ -115,6 +117,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
       setSelectedTemplate(null);
       setInstallMethod('template');
       setSelectedIso('');
+      setNetworkId('');
       setPorts([{ ext: 0, int: 22 }]); // Reset ports
     }
   }, [isOpen, initialType]);
@@ -316,6 +319,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
           "limits.cpu": cpu.toString(),
           "limits.memory": `${memory}MB`
         },
+        network_id: networkId,
       };
 
       if (type === 'virtual-machine' && installMethod === 'iso') {
@@ -613,21 +617,10 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
                     )}
 
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Network</label>
-                      <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 flex items-start gap-3">
-                        <div className="mt-0.5 text-emerald-500">
-                          <Network size={16} />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-zinc-200 flex items-center gap-2">
-                            Auto-Allocated IP
-                            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">SMART IPAM</span>
-                          </div>
-                          <p className="text-xs text-zinc-500 mt-1">
-                            System will automatically select the best available IP from private pools (e.g., 172.16.x.x).
-                          </p>
-                        </div>
-                      </div>
+                      <NetworkSelector
+                        selectedId={networkId}
+                        onChange={setNetworkId}
+                      />
                     </div>
                   </div>
                 </div>

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.1
-// source: proto/axhv.proto
+// source: axhv.proto
 
 package pb
 
@@ -30,7 +30,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_proto_axhv_proto_msgTypes[0]
+	mi := &file_axhv_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +42,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[0]
+	mi := &file_axhv_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +55,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{0}
+	return file_axhv_proto_rawDescGZIP(), []int{0}
 }
 
 type VmIdRequest struct {
@@ -67,7 +67,7 @@ type VmIdRequest struct {
 
 func (x *VmIdRequest) Reset() {
 	*x = VmIdRequest{}
-	mi := &file_proto_axhv_proto_msgTypes[1]
+	mi := &file_axhv_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -79,7 +79,7 @@ func (x *VmIdRequest) String() string {
 func (*VmIdRequest) ProtoMessage() {}
 
 func (x *VmIdRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[1]
+	mi := &file_axhv_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -92,12 +92,64 @@ func (x *VmIdRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmIdRequest.ProtoReflect.Descriptor instead.
 func (*VmIdRequest) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{1}
+	return file_axhv_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *VmIdRequest) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+type GetVmStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TapName       string                 `protobuf:"bytes,2,opt,name=tap_name,json=tapName,proto3" json:"tap_name,omitempty"` // Optional: overrides auto-detection
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetVmStatsRequest) Reset() {
+	*x = GetVmStatsRequest{}
+	mi := &file_axhv_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetVmStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetVmStatsRequest) ProtoMessage() {}
+
+func (x *GetVmStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_axhv_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetVmStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetVmStatsRequest) Descriptor() ([]byte, []int) {
+	return file_axhv_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetVmStatsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *GetVmStatsRequest) GetTapName() string {
+	if x != nil {
+		return x.TapName
 	}
 	return ""
 }
@@ -113,7 +165,7 @@ type VmResponse struct {
 
 func (x *VmResponse) Reset() {
 	*x = VmResponse{}
-	mi := &file_proto_axhv_proto_msgTypes[2]
+	mi := &file_axhv_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -125,7 +177,7 @@ func (x *VmResponse) String() string {
 func (*VmResponse) ProtoMessage() {}
 
 func (x *VmResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[2]
+	mi := &file_axhv_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -138,7 +190,7 @@ func (x *VmResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmResponse.ProtoReflect.Descriptor instead.
 func (*VmResponse) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{2}
+	return file_axhv_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *VmResponse) GetSuccess() bool {
@@ -165,28 +217,31 @@ func (x *VmResponse) GetVmId() string {
 // VM Creation
 type CreateVmRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
-	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Vcpu       uint32                 `protobuf:"varint,2,opt,name=vcpu,proto3" json:"vcpu,omitempty"`
-	MemoryMib  uint32                 `protobuf:"varint,3,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`
-	KernelPath string                 `protobuf:"bytes,4,opt,name=kernel_path,json=kernelPath,proto3" json:"kernel_path,omitempty"`
-	// Use either rootfs_path OR template
-	RootfsPath   string `protobuf:"bytes,5,opt,name=rootfs_path,json=rootfsPath,proto3" json:"rootfs_path,omitempty"`
-	Template     string `protobuf:"bytes,6,opt,name=template,proto3" json:"template,omitempty"`
-	DiskSizeGb   uint32 `protobuf:"varint,7,opt,name=disk_size_gb,json=diskSizeGb,proto3" json:"disk_size_gb,omitempty"`
-	GuestIp      string `protobuf:"bytes,8,opt,name=guest_ip,json=guestIp,proto3" json:"guest_ip,omitempty"`
-	GuestGateway string `protobuf:"bytes,9,opt,name=guest_gateway,json=guestGateway,proto3" json:"guest_gateway,omitempty"`
-	BootArgs     string `protobuf:"bytes,10,opt,name=boot_args,json=bootArgs,proto3" json:"boot_args,omitempty"`
-	// Network Limits & Forwarding
-	BandwidthLimitMbps uint32            `protobuf:"varint,11,opt,name=bandwidth_limit_mbps,json=bandwidthLimitMbps,proto3" json:"bandwidth_limit_mbps,omitempty"`
-	PortMapTcp         map[string]uint32 `protobuf:"bytes,12,rep,name=port_map_tcp,json=portMapTcp,proto3" json:"port_map_tcp,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // "external_port": internal_port
-	PortMapUdp         map[string]uint32 `protobuf:"bytes,13,rep,name=port_map_udp,json=portMapUdp,proto3" json:"port_map_udp,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                   // Unique ID (UUID recommended)
+	Vcpu       uint32                 `protobuf:"varint,2,opt,name=vcpu,proto3" json:"vcpu,omitempty"`                              // Number of vCPUs (1-256)
+	MemoryMib  uint32                 `protobuf:"varint,3,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`   // Memory in MiB
+	KernelPath string                 `protobuf:"bytes,4,opt,name=kernel_path,json=kernelPath,proto3" json:"kernel_path,omitempty"` // Absolute path to vmlinux
+	// Option 1: Direct path (for custom images)
+	RootfsPath string `protobuf:"bytes,5,opt,name=rootfs_path,json=rootfsPath,proto3" json:"rootfs_path,omitempty"` // Absolute path to rootfs image (optional if template set)
+	// Network (TAP auto-generated as "axhv-{id}")
+	GuestIp      string `protobuf:"bytes,7,opt,name=guest_ip,json=guestIp,proto3" json:"guest_ip,omitempty"`                // Guest IP address (e.g., 172.16.0.2)
+	GuestGateway string `protobuf:"bytes,8,opt,name=guest_gateway,json=guestGateway,proto3" json:"guest_gateway,omitempty"` // Gateway IP (e.g., 172.16.0.1)
+	BootArgs     string `protobuf:"bytes,9,opt,name=boot_args,json=bootArgs,proto3" json:"boot_args,omitempty"`             // Extra boot args (optional)
+	// Option 2: Template name (auto-download from R2 + clone)
+	Template string `protobuf:"bytes,10,opt,name=template,proto3" json:"template,omitempty"` // Template name (e.g., "ubuntu-rootfs.ext4")
+	// Disk size (cloned disk will be resized to this)
+	DiskSizeGb uint32 `protobuf:"varint,11,opt,name=disk_size_gb,json=diskSizeGb,proto3" json:"disk_size_gb,omitempty"` // Disk size in GB (default: same as source, min: 2)
+	// Free Tier Network Control
+	BandwidthLimitMbps uint32            `protobuf:"varint,14,opt,name=bandwidth_limit_mbps,json=bandwidthLimitMbps,proto3" json:"bandwidth_limit_mbps,omitempty"`                                                    // Rate limit (0 = unlimited, e.g., 10 for 10Mbps)
+	PortMapTcp         map[uint32]uint32 `protobuf:"bytes,15,rep,name=port_map_tcp,json=portMapTcp,proto3" json:"port_map_tcp,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // TCP port forwarding: host_port -> guest_port
+	PortMapUdp         map[uint32]uint32 `protobuf:"bytes,16,rep,name=port_map_udp,json=portMapUdp,proto3" json:"port_map_udp,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // UDP port forwarding: host_port -> guest_port
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateVmRequest) Reset() {
 	*x = CreateVmRequest{}
-	mi := &file_proto_axhv_proto_msgTypes[3]
+	mi := &file_axhv_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +253,7 @@ func (x *CreateVmRequest) String() string {
 func (*CreateVmRequest) ProtoMessage() {}
 
 func (x *CreateVmRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[3]
+	mi := &file_axhv_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -211,7 +266,7 @@ func (x *CreateVmRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVmRequest.ProtoReflect.Descriptor instead.
 func (*CreateVmRequest) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{3}
+	return file_axhv_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateVmRequest) GetId() string {
@@ -249,20 +304,6 @@ func (x *CreateVmRequest) GetRootfsPath() string {
 	return ""
 }
 
-func (x *CreateVmRequest) GetTemplate() string {
-	if x != nil {
-		return x.Template
-	}
-	return ""
-}
-
-func (x *CreateVmRequest) GetDiskSizeGb() uint32 {
-	if x != nil {
-		return x.DiskSizeGb
-	}
-	return 0
-}
-
 func (x *CreateVmRequest) GetGuestIp() string {
 	if x != nil {
 		return x.GuestIp
@@ -284,6 +325,20 @@ func (x *CreateVmRequest) GetBootArgs() string {
 	return ""
 }
 
+func (x *CreateVmRequest) GetTemplate() string {
+	if x != nil {
+		return x.Template
+	}
+	return ""
+}
+
+func (x *CreateVmRequest) GetDiskSizeGb() uint32 {
+	if x != nil {
+		return x.DiskSizeGb
+	}
+	return 0
+}
+
 func (x *CreateVmRequest) GetBandwidthLimitMbps() uint32 {
 	if x != nil {
 		return x.BandwidthLimitMbps
@@ -291,14 +346,14 @@ func (x *CreateVmRequest) GetBandwidthLimitMbps() uint32 {
 	return 0
 }
 
-func (x *CreateVmRequest) GetPortMapTcp() map[string]uint32 {
+func (x *CreateVmRequest) GetPortMapTcp() map[uint32]uint32 {
 	if x != nil {
 		return x.PortMapTcp
 	}
 	return nil
 }
 
-func (x *CreateVmRequest) GetPortMapUdp() map[string]uint32 {
+func (x *CreateVmRequest) GetPortMapUdp() map[uint32]uint32 {
 	if x != nil {
 		return x.PortMapUdp
 	}
@@ -316,7 +371,7 @@ type ResizeDiskRequest struct {
 
 func (x *ResizeDiskRequest) Reset() {
 	*x = ResizeDiskRequest{}
-	mi := &file_proto_axhv_proto_msgTypes[4]
+	mi := &file_axhv_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +383,7 @@ func (x *ResizeDiskRequest) String() string {
 func (*ResizeDiskRequest) ProtoMessage() {}
 
 func (x *ResizeDiskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[4]
+	mi := &file_axhv_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +396,7 @@ func (x *ResizeDiskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeDiskRequest.ProtoReflect.Descriptor instead.
 func (*ResizeDiskRequest) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{4}
+	return file_axhv_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ResizeDiskRequest) GetId() string {
@@ -368,7 +423,7 @@ type ListVmsResponse struct {
 
 func (x *ListVmsResponse) Reset() {
 	*x = ListVmsResponse{}
-	mi := &file_proto_axhv_proto_msgTypes[5]
+	mi := &file_axhv_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -380,7 +435,7 @@ func (x *ListVmsResponse) String() string {
 func (*ListVmsResponse) ProtoMessage() {}
 
 func (x *ListVmsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[5]
+	mi := &file_axhv_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -393,7 +448,7 @@ func (x *ListVmsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVmsResponse.ProtoReflect.Descriptor instead.
 func (*ListVmsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{5}
+	return file_axhv_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListVmsResponse) GetVms() []*VmInfo {
@@ -414,7 +469,7 @@ type VmInfo struct {
 
 func (x *VmInfo) Reset() {
 	*x = VmInfo{}
-	mi := &file_proto_axhv_proto_msgTypes[6]
+	mi := &file_axhv_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -426,7 +481,7 @@ func (x *VmInfo) String() string {
 func (*VmInfo) ProtoMessage() {}
 
 func (x *VmInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[6]
+	mi := &file_axhv_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -439,7 +494,7 @@ func (x *VmInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmInfo.ProtoReflect.Descriptor instead.
 func (*VmInfo) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{6}
+	return file_axhv_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *VmInfo) GetId() string {
@@ -466,18 +521,18 @@ func (x *VmInfo) GetSocketPath() string {
 // Stats
 type VmStatsResponse struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
-	CpuUsageUs         string                 `protobuf:"bytes,1,opt,name=cpu_usage_us,json=cpuUsageUs,proto3" json:"cpu_usage_us,omitempty"` // Microseconds
-	MemoryUsedBytes    string                 `protobuf:"bytes,2,opt,name=memory_used_bytes,json=memoryUsedBytes,proto3" json:"memory_used_bytes,omitempty"`
-	NetRxBytes         string                 `protobuf:"bytes,3,opt,name=net_rx_bytes,json=netRxBytes,proto3" json:"net_rx_bytes,omitempty"` // Upload (from VM perspective)
-	NetTxBytes         string                 `protobuf:"bytes,4,opt,name=net_tx_bytes,json=netTxBytes,proto3" json:"net_tx_bytes,omitempty"` // Download (from VM perspective)
-	DiskAllocatedBytes string                 `protobuf:"bytes,5,opt,name=disk_allocated_bytes,json=diskAllocatedBytes,proto3" json:"disk_allocated_bytes,omitempty"`
+	CpuUsageUs         uint64                 `protobuf:"varint,1,opt,name=cpu_usage_us,json=cpuUsageUs,proto3" json:"cpu_usage_us,omitempty"`                         // Total CPU usage in microseconds
+	MemoryUsedBytes    uint64                 `protobuf:"varint,2,opt,name=memory_used_bytes,json=memoryUsedBytes,proto3" json:"memory_used_bytes,omitempty"`          // Current RAM usage
+	NetRxBytes         uint64                 `protobuf:"varint,3,opt,name=net_rx_bytes,json=netRxBytes,proto3" json:"net_rx_bytes,omitempty"`                         // Total accumulated download
+	NetTxBytes         uint64                 `protobuf:"varint,4,opt,name=net_tx_bytes,json=netTxBytes,proto3" json:"net_tx_bytes,omitempty"`                         // Total accumulated upload
+	DiskAllocatedBytes uint64                 `protobuf:"varint,5,opt,name=disk_allocated_bytes,json=diskAllocatedBytes,proto3" json:"disk_allocated_bytes,omitempty"` // Physical file size on host (sparse)
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *VmStatsResponse) Reset() {
 	*x = VmStatsResponse{}
-	mi := &file_proto_axhv_proto_msgTypes[7]
+	mi := &file_axhv_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -489,7 +544,7 @@ func (x *VmStatsResponse) String() string {
 func (*VmStatsResponse) ProtoMessage() {}
 
 func (x *VmStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[7]
+	mi := &file_axhv_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -502,42 +557,42 @@ func (x *VmStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmStatsResponse.ProtoReflect.Descriptor instead.
 func (*VmStatsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{7}
+	return file_axhv_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *VmStatsResponse) GetCpuUsageUs() string {
+func (x *VmStatsResponse) GetCpuUsageUs() uint64 {
 	if x != nil {
 		return x.CpuUsageUs
 	}
-	return ""
+	return 0
 }
 
-func (x *VmStatsResponse) GetMemoryUsedBytes() string {
+func (x *VmStatsResponse) GetMemoryUsedBytes() uint64 {
 	if x != nil {
 		return x.MemoryUsedBytes
 	}
-	return ""
+	return 0
 }
 
-func (x *VmStatsResponse) GetNetRxBytes() string {
+func (x *VmStatsResponse) GetNetRxBytes() uint64 {
 	if x != nil {
 		return x.NetRxBytes
 	}
-	return ""
+	return 0
 }
 
-func (x *VmStatsResponse) GetNetTxBytes() string {
+func (x *VmStatsResponse) GetNetTxBytes() uint64 {
 	if x != nil {
 		return x.NetTxBytes
 	}
-	return ""
+	return 0
 }
 
-func (x *VmStatsResponse) GetDiskAllocatedBytes() string {
+func (x *VmStatsResponse) GetDiskAllocatedBytes() uint64 {
 	if x != nil {
 		return x.DiskAllocatedBytes
 	}
-	return ""
+	return 0
 }
 
 type HostStatsResponse struct {
@@ -552,7 +607,7 @@ type HostStatsResponse struct {
 
 func (x *HostStatsResponse) Reset() {
 	*x = HostStatsResponse{}
-	mi := &file_proto_axhv_proto_msgTypes[8]
+	mi := &file_axhv_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +619,7 @@ func (x *HostStatsResponse) String() string {
 func (*HostStatsResponse) ProtoMessage() {}
 
 func (x *HostStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_axhv_proto_msgTypes[8]
+	mi := &file_axhv_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +632,7 @@ func (x *HostStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostStatsResponse.ProtoReflect.Descriptor instead.
 func (*HostStatsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_axhv_proto_rawDescGZIP(), []int{8}
+	return file_axhv_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *HostStatsResponse) GetDiskTotalMib() uint64 {
@@ -608,14 +663,18 @@ func (x *HostStatsResponse) GetVmCount() uint32 {
 	return 0
 }
 
-var File_proto_axhv_proto protoreflect.FileDescriptor
+var File_axhv_proto protoreflect.FileDescriptor
 
-const file_proto_axhv_proto_rawDesc = "" +
+const file_axhv_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/axhv.proto\x12\x04axhv\"\a\n" +
+	"\n" +
+	"axhv.proto\x12\x04axhv\"\a\n" +
 	"\x05Empty\"\x1d\n" +
 	"\vVmIdRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"U\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\">\n" +
+	"\x11GetVmStatsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\btap_name\x18\x02 \x01(\tR\atapName\"U\n" +
 	"\n" +
 	"VmResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
@@ -629,24 +688,24 @@ const file_proto_axhv_proto_rawDesc = "" +
 	"\vkernel_path\x18\x04 \x01(\tR\n" +
 	"kernelPath\x12\x1f\n" +
 	"\vrootfs_path\x18\x05 \x01(\tR\n" +
-	"rootfsPath\x12\x1a\n" +
-	"\btemplate\x18\x06 \x01(\tR\btemplate\x12 \n" +
-	"\fdisk_size_gb\x18\a \x01(\rR\n" +
-	"diskSizeGb\x12\x19\n" +
-	"\bguest_ip\x18\b \x01(\tR\aguestIp\x12#\n" +
-	"\rguest_gateway\x18\t \x01(\tR\fguestGateway\x12\x1b\n" +
-	"\tboot_args\x18\n" +
-	" \x01(\tR\bbootArgs\x120\n" +
-	"\x14bandwidth_limit_mbps\x18\v \x01(\rR\x12bandwidthLimitMbps\x12G\n" +
-	"\fport_map_tcp\x18\f \x03(\v2%.axhv.CreateVmRequest.PortMapTcpEntryR\n" +
+	"rootfsPath\x12\x19\n" +
+	"\bguest_ip\x18\a \x01(\tR\aguestIp\x12#\n" +
+	"\rguest_gateway\x18\b \x01(\tR\fguestGateway\x12\x1b\n" +
+	"\tboot_args\x18\t \x01(\tR\bbootArgs\x12\x1a\n" +
+	"\btemplate\x18\n" +
+	" \x01(\tR\btemplate\x12 \n" +
+	"\fdisk_size_gb\x18\v \x01(\rR\n" +
+	"diskSizeGb\x120\n" +
+	"\x14bandwidth_limit_mbps\x18\x0e \x01(\rR\x12bandwidthLimitMbps\x12G\n" +
+	"\fport_map_tcp\x18\x0f \x03(\v2%.axhv.CreateVmRequest.PortMapTcpEntryR\n" +
 	"portMapTcp\x12G\n" +
-	"\fport_map_udp\x18\r \x03(\v2%.axhv.CreateVmRequest.PortMapUdpEntryR\n" +
+	"\fport_map_udp\x18\x10 \x03(\v2%.axhv.CreateVmRequest.PortMapUdpEntryR\n" +
 	"portMapUdp\x1a=\n" +
 	"\x0fPortMapTcpEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x03key\x18\x01 \x01(\rR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\x1a=\n" +
 	"\x0fPortMapUdpEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x03key\x18\x01 \x01(\rR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\"C\n" +
 	"\x11ResizeDiskRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1e\n" +
@@ -659,19 +718,19 @@ const file_proto_axhv_proto_rawDesc = "" +
 	"\vsocket_path\x18\x03 \x01(\tR\n" +
 	"socketPath\"\xd5\x01\n" +
 	"\x0fVmStatsResponse\x12 \n" +
-	"\fcpu_usage_us\x18\x01 \x01(\tR\n" +
+	"\fcpu_usage_us\x18\x01 \x01(\x04R\n" +
 	"cpuUsageUs\x12*\n" +
-	"\x11memory_used_bytes\x18\x02 \x01(\tR\x0fmemoryUsedBytes\x12 \n" +
-	"\fnet_rx_bytes\x18\x03 \x01(\tR\n" +
+	"\x11memory_used_bytes\x18\x02 \x01(\x04R\x0fmemoryUsedBytes\x12 \n" +
+	"\fnet_rx_bytes\x18\x03 \x01(\x04R\n" +
 	"netRxBytes\x12 \n" +
-	"\fnet_tx_bytes\x18\x04 \x01(\tR\n" +
+	"\fnet_tx_bytes\x18\x04 \x01(\x04R\n" +
 	"netTxBytes\x120\n" +
-	"\x14disk_allocated_bytes\x18\x05 \x01(\tR\x12diskAllocatedBytes\"\x9c\x01\n" +
+	"\x14disk_allocated_bytes\x18\x05 \x01(\x04R\x12diskAllocatedBytes\"\x9c\x01\n" +
 	"\x11HostStatsResponse\x12$\n" +
 	"\x0edisk_total_mib\x18\x01 \x01(\x04R\fdiskTotalMib\x12\"\n" +
 	"\rdisk_used_mib\x18\x02 \x01(\x04R\vdiskUsedMib\x12\"\n" +
 	"\rdisk_free_mib\x18\x03 \x01(\x04R\vdiskFreeMib\x12\x19\n" +
-	"\bvm_count\x18\x04 \x01(\rR\avmCount2\xb8\x04\n" +
+	"\bvm_count\x18\x04 \x01(\rR\avmCount2\xbe\x04\n" +
 	"\tVmService\x123\n" +
 	"\bCreateVm\x12\x15.axhv.CreateVmRequest\x1a\x10.axhv.VmResponse\x12.\n" +
 	"\aStartVm\x12\x11.axhv.VmIdRequest\x1a\x10.axhv.VmResponse\x12-\n" +
@@ -682,63 +741,64 @@ const file_proto_axhv_proto_rawDesc = "" +
 	"\bDeleteVm\x12\x11.axhv.VmIdRequest\x1a\x10.axhv.VmResponse\x127\n" +
 	"\n" +
 	"ResizeDisk\x12\x17.axhv.ResizeDiskRequest\x1a\x10.axhv.VmResponse\x12-\n" +
-	"\aListVms\x12\v.axhv.Empty\x1a\x15.axhv.ListVmsResponse\x126\n" +
+	"\aListVms\x12\v.axhv.Empty\x1a\x15.axhv.ListVmsResponse\x12<\n" +
 	"\n" +
-	"GetVmStats\x12\x11.axhv.VmIdRequest\x1a\x15.axhv.VmStatsResponse\x124\n" +
+	"GetVmStats\x12\x17.axhv.GetVmStatsRequest\x1a\x15.axhv.VmStatsResponse\x124\n" +
 	"\fGetHostStats\x12\v.axhv.Empty\x1a\x17.axhv.HostStatsResponseB!Z\x1faexon/internal/provider/axhv/pbb\x06proto3"
 
 var (
-	file_proto_axhv_proto_rawDescOnce sync.Once
-	file_proto_axhv_proto_rawDescData []byte
+	file_axhv_proto_rawDescOnce sync.Once
+	file_axhv_proto_rawDescData []byte
 )
 
-func file_proto_axhv_proto_rawDescGZIP() []byte {
-	file_proto_axhv_proto_rawDescOnce.Do(func() {
-		file_proto_axhv_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_axhv_proto_rawDesc), len(file_proto_axhv_proto_rawDesc)))
+func file_axhv_proto_rawDescGZIP() []byte {
+	file_axhv_proto_rawDescOnce.Do(func() {
+		file_axhv_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_axhv_proto_rawDesc), len(file_axhv_proto_rawDesc)))
 	})
-	return file_proto_axhv_proto_rawDescData
+	return file_axhv_proto_rawDescData
 }
 
-var file_proto_axhv_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
-var file_proto_axhv_proto_goTypes = []any{
+var file_axhv_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_axhv_proto_goTypes = []any{
 	(*Empty)(nil),             // 0: axhv.Empty
 	(*VmIdRequest)(nil),       // 1: axhv.VmIdRequest
-	(*VmResponse)(nil),        // 2: axhv.VmResponse
-	(*CreateVmRequest)(nil),   // 3: axhv.CreateVmRequest
-	(*ResizeDiskRequest)(nil), // 4: axhv.ResizeDiskRequest
-	(*ListVmsResponse)(nil),   // 5: axhv.ListVmsResponse
-	(*VmInfo)(nil),            // 6: axhv.VmInfo
-	(*VmStatsResponse)(nil),   // 7: axhv.VmStatsResponse
-	(*HostStatsResponse)(nil), // 8: axhv.HostStatsResponse
-	nil,                       // 9: axhv.CreateVmRequest.PortMapTcpEntry
-	nil,                       // 10: axhv.CreateVmRequest.PortMapUdpEntry
+	(*GetVmStatsRequest)(nil), // 2: axhv.GetVmStatsRequest
+	(*VmResponse)(nil),        // 3: axhv.VmResponse
+	(*CreateVmRequest)(nil),   // 4: axhv.CreateVmRequest
+	(*ResizeDiskRequest)(nil), // 5: axhv.ResizeDiskRequest
+	(*ListVmsResponse)(nil),   // 6: axhv.ListVmsResponse
+	(*VmInfo)(nil),            // 7: axhv.VmInfo
+	(*VmStatsResponse)(nil),   // 8: axhv.VmStatsResponse
+	(*HostStatsResponse)(nil), // 9: axhv.HostStatsResponse
+	nil,                       // 10: axhv.CreateVmRequest.PortMapTcpEntry
+	nil,                       // 11: axhv.CreateVmRequest.PortMapUdpEntry
 }
-var file_proto_axhv_proto_depIdxs = []int32{
-	9,  // 0: axhv.CreateVmRequest.port_map_tcp:type_name -> axhv.CreateVmRequest.PortMapTcpEntry
-	10, // 1: axhv.CreateVmRequest.port_map_udp:type_name -> axhv.CreateVmRequest.PortMapUdpEntry
-	6,  // 2: axhv.ListVmsResponse.vms:type_name -> axhv.VmInfo
-	3,  // 3: axhv.VmService.CreateVm:input_type -> axhv.CreateVmRequest
+var file_axhv_proto_depIdxs = []int32{
+	10, // 0: axhv.CreateVmRequest.port_map_tcp:type_name -> axhv.CreateVmRequest.PortMapTcpEntry
+	11, // 1: axhv.CreateVmRequest.port_map_udp:type_name -> axhv.CreateVmRequest.PortMapUdpEntry
+	7,  // 2: axhv.ListVmsResponse.vms:type_name -> axhv.VmInfo
+	4,  // 3: axhv.VmService.CreateVm:input_type -> axhv.CreateVmRequest
 	1,  // 4: axhv.VmService.StartVm:input_type -> axhv.VmIdRequest
 	1,  // 5: axhv.VmService.StopVm:input_type -> axhv.VmIdRequest
 	1,  // 6: axhv.VmService.PauseVm:input_type -> axhv.VmIdRequest
 	1,  // 7: axhv.VmService.ResumeVm:input_type -> axhv.VmIdRequest
 	1,  // 8: axhv.VmService.RebootVm:input_type -> axhv.VmIdRequest
 	1,  // 9: axhv.VmService.DeleteVm:input_type -> axhv.VmIdRequest
-	4,  // 10: axhv.VmService.ResizeDisk:input_type -> axhv.ResizeDiskRequest
+	5,  // 10: axhv.VmService.ResizeDisk:input_type -> axhv.ResizeDiskRequest
 	0,  // 11: axhv.VmService.ListVms:input_type -> axhv.Empty
-	1,  // 12: axhv.VmService.GetVmStats:input_type -> axhv.VmIdRequest
+	2,  // 12: axhv.VmService.GetVmStats:input_type -> axhv.GetVmStatsRequest
 	0,  // 13: axhv.VmService.GetHostStats:input_type -> axhv.Empty
-	2,  // 14: axhv.VmService.CreateVm:output_type -> axhv.VmResponse
-	2,  // 15: axhv.VmService.StartVm:output_type -> axhv.VmResponse
-	2,  // 16: axhv.VmService.StopVm:output_type -> axhv.VmResponse
-	2,  // 17: axhv.VmService.PauseVm:output_type -> axhv.VmResponse
-	2,  // 18: axhv.VmService.ResumeVm:output_type -> axhv.VmResponse
-	2,  // 19: axhv.VmService.RebootVm:output_type -> axhv.VmResponse
-	2,  // 20: axhv.VmService.DeleteVm:output_type -> axhv.VmResponse
-	2,  // 21: axhv.VmService.ResizeDisk:output_type -> axhv.VmResponse
-	5,  // 22: axhv.VmService.ListVms:output_type -> axhv.ListVmsResponse
-	7,  // 23: axhv.VmService.GetVmStats:output_type -> axhv.VmStatsResponse
-	8,  // 24: axhv.VmService.GetHostStats:output_type -> axhv.HostStatsResponse
+	3,  // 14: axhv.VmService.CreateVm:output_type -> axhv.VmResponse
+	3,  // 15: axhv.VmService.StartVm:output_type -> axhv.VmResponse
+	3,  // 16: axhv.VmService.StopVm:output_type -> axhv.VmResponse
+	3,  // 17: axhv.VmService.PauseVm:output_type -> axhv.VmResponse
+	3,  // 18: axhv.VmService.ResumeVm:output_type -> axhv.VmResponse
+	3,  // 19: axhv.VmService.RebootVm:output_type -> axhv.VmResponse
+	3,  // 20: axhv.VmService.DeleteVm:output_type -> axhv.VmResponse
+	3,  // 21: axhv.VmService.ResizeDisk:output_type -> axhv.VmResponse
+	6,  // 22: axhv.VmService.ListVms:output_type -> axhv.ListVmsResponse
+	8,  // 23: axhv.VmService.GetVmStats:output_type -> axhv.VmStatsResponse
+	9,  // 24: axhv.VmService.GetHostStats:output_type -> axhv.HostStatsResponse
 	14, // [14:25] is the sub-list for method output_type
 	3,  // [3:14] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
@@ -746,26 +806,26 @@ var file_proto_axhv_proto_depIdxs = []int32{
 	0,  // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_proto_axhv_proto_init() }
-func file_proto_axhv_proto_init() {
-	if File_proto_axhv_proto != nil {
+func init() { file_axhv_proto_init() }
+func file_axhv_proto_init() {
+	if File_axhv_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_axhv_proto_rawDesc), len(file_proto_axhv_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_axhv_proto_rawDesc), len(file_axhv_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_axhv_proto_goTypes,
-		DependencyIndexes: file_proto_axhv_proto_depIdxs,
-		MessageInfos:      file_proto_axhv_proto_msgTypes,
+		GoTypes:           file_axhv_proto_goTypes,
+		DependencyIndexes: file_axhv_proto_depIdxs,
+		MessageInfos:      file_axhv_proto_msgTypes,
 	}.Build()
-	File_proto_axhv_proto = out.File
-	file_proto_axhv_proto_goTypes = nil
-	file_proto_axhv_proto_depIdxs = nil
+	File_axhv_proto = out.File
+	file_axhv_proto_goTypes = nil
+	file_axhv_proto_depIdxs = nil
 }

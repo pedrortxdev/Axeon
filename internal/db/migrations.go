@@ -217,6 +217,31 @@ var migrations = []Migration{
 			DELETE FROM networks WHERE cidr IN ('172.16.0.0/24', '10.0.0.0/24', '192.168.100.0/24');
 		`,
 	},
+	{
+		Version:     10,
+		Description: "Remove duplicate Default Private network",
+		Up: `
+			DELETE FROM ip_leases WHERE network_id IN (SELECT id FROM networks WHERE name = 'Default Private');
+			DELETE FROM networks WHERE name = 'Default Private';
+		`,
+		Down: `
+			-- No-op or restore if feasible, but we treat this as a cleanup
+			INSERT INTO networks (name, cidr, gateway, is_public) 
+			VALUES ('Default Private', '172.16.0.0/24', '172.16.0.1', false)
+			ON CONFLICT DO NOTHING;
+		`,
+	},
+	{
+		Version:     11,
+		Description: "Drop foreign key constraint on ip_leases.instance_name",
+		Up: `
+			ALTER TABLE ip_leases DROP CONSTRAINT IF EXISTS fk_instance;
+		`,
+		Down: `
+			ALTER TABLE ip_leases 
+			ADD CONSTRAINT fk_instance FOREIGN KEY (instance_name) REFERENCES instances(name) ON DELETE SET NULL;
+		`,
+	},
 }
 
 // ============================================================================

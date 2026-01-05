@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.33.1
-// source: proto/axhv.proto
+// source: axhv.proto
 
 package pb
 
@@ -48,7 +48,7 @@ type VmServiceClient interface {
 	ResizeDisk(ctx context.Context, in *ResizeDiskRequest, opts ...grpc.CallOption) (*VmResponse, error)
 	// Information & Stats
 	ListVms(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListVmsResponse, error)
-	GetVmStats(ctx context.Context, in *VmIdRequest, opts ...grpc.CallOption) (*VmStatsResponse, error)
+	GetVmStats(ctx context.Context, in *GetVmStatsRequest, opts ...grpc.CallOption) (*VmStatsResponse, error)
 	GetHostStats(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*HostStatsResponse, error)
 }
 
@@ -150,7 +150,7 @@ func (c *vmServiceClient) ListVms(ctx context.Context, in *Empty, opts ...grpc.C
 	return out, nil
 }
 
-func (c *vmServiceClient) GetVmStats(ctx context.Context, in *VmIdRequest, opts ...grpc.CallOption) (*VmStatsResponse, error) {
+func (c *vmServiceClient) GetVmStats(ctx context.Context, in *GetVmStatsRequest, opts ...grpc.CallOption) (*VmStatsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VmStatsResponse)
 	err := c.cc.Invoke(ctx, VmService_GetVmStats_FullMethodName, in, out, cOpts...)
@@ -186,7 +186,7 @@ type VmServiceServer interface {
 	ResizeDisk(context.Context, *ResizeDiskRequest) (*VmResponse, error)
 	// Information & Stats
 	ListVms(context.Context, *Empty) (*ListVmsResponse, error)
-	GetVmStats(context.Context, *VmIdRequest) (*VmStatsResponse, error)
+	GetVmStats(context.Context, *GetVmStatsRequest) (*VmStatsResponse, error)
 	GetHostStats(context.Context, *Empty) (*HostStatsResponse, error)
 	mustEmbedUnimplementedVmServiceServer()
 }
@@ -225,7 +225,7 @@ func (UnimplementedVmServiceServer) ResizeDisk(context.Context, *ResizeDiskReque
 func (UnimplementedVmServiceServer) ListVms(context.Context, *Empty) (*ListVmsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListVms not implemented")
 }
-func (UnimplementedVmServiceServer) GetVmStats(context.Context, *VmIdRequest) (*VmStatsResponse, error) {
+func (UnimplementedVmServiceServer) GetVmStats(context.Context, *GetVmStatsRequest) (*VmStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetVmStats not implemented")
 }
 func (UnimplementedVmServiceServer) GetHostStats(context.Context, *Empty) (*HostStatsResponse, error) {
@@ -415,7 +415,7 @@ func _VmService_ListVms_Handler(srv interface{}, ctx context.Context, dec func(i
 }
 
 func _VmService_GetVmStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VmIdRequest)
+	in := new(GetVmStatsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func _VmService_GetVmStats_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: VmService_GetVmStats_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VmServiceServer).GetVmStats(ctx, req.(*VmIdRequest))
+		return srv.(VmServiceServer).GetVmStats(ctx, req.(*GetVmStatsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -503,5 +503,5 @@ var VmService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/axhv.proto",
+	Metadata: "axhv.proto",
 }

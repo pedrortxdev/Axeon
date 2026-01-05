@@ -48,6 +48,22 @@ func (s *Service) AllocateIP(ctx context.Context, instanceName string) (string, 
 	return "", fmt.Errorf("no IP addresses available in any pool")
 }
 
+// AllocateInNetwork allocates an IP in a specific network pool.
+func (s *Service) AllocateInNetwork(ctx context.Context, networkID string, instanceName string) (string, error) {
+	var net Network
+	query := `SELECT id, name, cidr, gateway, dns1, vlan_id, is_public FROM networks WHERE id = $1`
+	err := s.QueryRowContext(ctx, query, networkID).Scan(&net.ID, &net.Name, &net.CIDR, &net.Gateway, &net.DNS1, &net.VlanID, &net.IsPublic)
+	if err != nil {
+		return "", fmt.Errorf("network not found: %w", err)
+	}
+
+	ip, err := s.tryAllocateInNetwork(ctx, net, instanceName)
+	if err != nil {
+		return "", fmt.Errorf("allocation failed in pool %s: %w", net.Name, err)
+	}
+	return ip, nil
+}
+
 func (s *Service) getAvailableNetworks(ctx context.Context, isPro bool) ([]Network, error) {
 	query := `SELECT id, name, cidr, gateway, dns1, vlan_id, is_public FROM networks WHERE is_public = $1 ORDER BY created_at ASC`
 
@@ -125,123 +141,95 @@ func (s *Service) CreateNetwork(ctx context.Context, n Network) error {
 }
 
 func (s *Service) tryAllocateInNetwork(ctx context.Context, netDef Network, instanceName string) (string, error) {
-	tx, err := s.BeginTx(ctx, nil)
+	// 1. Calculate Range
+	startIP, endIP, err := CidrToRange(netDef.CIDR)
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback()
 
-	// 1. Lock the network definition (Concurrency Control)
-	// This prevents two VMs from racing for the same "next IP" calculation
-	var lockedID string
-	err = tx.QueryRowContext(ctx, "SELECT id FROM networks WHERE id = $1 FOR UPDATE", netDef.ID).Scan(&lockedID)
-	if err != nil {
-		return "", fmt.Errorf("failed to lock network: %w", err)
-	}
+	// DEBUG: Log the calculated range
+	log.Printf("[IPAM-DEBUG] Network=%s CIDR=%s StartIP=%d EndIP=%d TotalIPs=%d", netDef.Name, netDef.CIDR, startIP, endIP, endIP-startIP)
 
-	// 2. Parse CIDR
-	_, ipNet, err := net.ParseCIDR(netDef.CIDR)
-	if err != nil {
-		return "", fmt.Errorf("invalid cidr: %w", err)
-	}
+	// Start searching from Start + 2 (Skipping Network .0 and Gateway .1)
+	currentIP := startIP + 2
 
-	startIP := ipToInt(ipNet.IP)
-	maskOnes, _ := ipNet.Mask.Size()
-	totalIPs := 1 << (32 - maskOnes)
-
-	// Exclude Network, Gateway, Broadcast
-	// Typical /24: .0 (Net), .1 (Gateway), .255 (Broadcast)
-	// We iterate from Start+2 to End-1 (assuming .1 is Gateway)
-	// Ideally we respect netDef.Gateway to skip it specifically.
-
-	endIP := startIP + uint32(totalIPs) - 1
-
-	// Range to search: Start+1 to End-1
-	// If Gateway is .1, we skip it.
-
-	// 3. Fetch ALL existing leases for this network (to find holes)
-	// We fetch Map[IP] -> instance_name
-	rows, err := tx.QueryContext(ctx, "SELECT ip, instance_name FROM ip_leases WHERE network_id = $1", netDef.ID)
+	// 2. Fetch ALL used IPs in this network (ignoring placeholders)
+	query := `SELECT ip FROM ip_leases WHERE network_id = $1 AND instance_name IS NOT NULL`
+	rows, err := s.QueryContext(ctx, query, netDef.ID)
 	if err != nil {
 		return "", err
 	}
 	defer rows.Close()
 
-	leasedIPs := make(map[uint32]string) // Map IP(int) -> InstanceName/Empty
+	usedMap := make(map[string]bool)
 	for rows.Next() {
-		var ipStr string
-		var instName sql.NullString
-		if err := rows.Scan(&ipStr, &instName); err != nil {
+		var ip string
+		if err := rows.Scan(&ip); err != nil {
 			return "", err
 		}
+		usedMap[ip] = true
+	}
 
-		parsed := net.ParseIP(ipStr)
-		if parsed != nil {
-			val := ipToInt(parsed)
-			if instName.Valid {
-				leasedIPs[val] = instName.String // Used
-			} else {
-				leasedIPs[val] = "" // Pre-allocated but free
+	log.Printf("[IPAM-DEBUG] UsedIPs in network: %d", len(usedMap))
+
+	// 3. Find First Free IP
+	attemptCount := 0
+	for i := currentIP; i < endIP; i++ {
+		ipStr := IntToIP(i)
+		attemptCount++
+
+		if !usedMap[ipStr] {
+			// Found candidate! Try to reserve using Transaction for safety
+			tx, err := s.BeginTx(ctx, nil)
+			if err != nil {
+				log.Printf("[IPAM-DEBUG] Failed to begin TX: %v", err)
+				return "", err
 			}
+
+			// Check if row exists (in ANY network - ip is PK)
+			var existsGlobal bool
+			tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM ip_leases WHERE ip = $1)", ipStr).Scan(&existsGlobal)
+
+			if existsGlobal {
+				// Row exists - try to claim it for THIS network
+				res, err := tx.ExecContext(ctx,
+					"UPDATE ip_leases SET instance_name = $1, allocated_at = $2, network_id = $3 WHERE ip = $4 AND instance_name IS NULL",
+					instanceName, time.Now(), netDef.ID, ipStr)
+				if err != nil {
+					log.Printf("[IPAM-DEBUG] UPDATE failed for %s: %v", ipStr, err)
+					tx.Rollback()
+					continue
+				}
+				rowsAff, _ := res.RowsAffected()
+				if rowsAff == 0 {
+					log.Printf("[IPAM-DEBUG] UPDATE affected 0 rows for %s (already taken?)", ipStr)
+					tx.Rollback()
+					continue
+				}
+			} else {
+				// Insert new lease
+				_, err := tx.ExecContext(ctx,
+					"INSERT INTO ip_leases (ip, instance_name, allocated_at, network_id) VALUES ($1, $2, $3, $4)",
+					ipStr, instanceName, time.Now(), netDef.ID)
+				if err != nil {
+					log.Printf("[IPAM-DEBUG] INSERT failed for %s: %v", ipStr, err)
+					tx.Rollback()
+					continue
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
+				log.Printf("[IPAM-DEBUG] COMMIT failed for %s: %v", ipStr, err)
+				continue
+			}
+
+			log.Printf("[IPAM-DEBUG] SUCCESS: Allocated %s after %d attempts", ipStr, attemptCount)
+			return ipStr, nil
 		}
 	}
 
-	// 4. Find the Hole
-	var candidateIP uint32
-	found := false
-
-	gatewayInt := ipToInt(net.ParseIP(netDef.Gateway))
-
-	// Simple linear scan (efficient enough for /24 and /16)
-	// Start at .2 usually (Start+2 if Gateway is .1)
-	for i := startIP + 1; i < endIP; i++ {
-		if i == gatewayInt {
-			continue // Skip gateway
-		}
-
-		// Check status
-		owner, exists := leasedIPs[i]
-
-		if !exists {
-			// Case A: Sparse Mode - Row doesn't exist. It's free!
-			candidateIP = i
-			found = true
-			break
-		} else if owner == "" {
-			// Case B: Pre-populated Mode - Row exists, but owner is empty. It's free!
-			candidateIP = i
-			found = true
-			break
-		}
-		// Else: Owned, continue
-	}
-
-	if !found {
-		return "", fmt.Errorf("network full")
-	}
-
-	candidateIPStr := intToIP(candidateIP).String()
-
-	// 5. Claim IP
-	// If it existed (empty owner), UPDATE. If not, INSERT.
-
-	if _, exists := leasedIPs[candidateIP]; exists {
-		// UPDATE
-		_, err = tx.ExecContext(ctx,
-			"UPDATE ip_leases SET instance_name = $1, allocated_at = $2 WHERE ip = $3 AND network_id = $4",
-			instanceName, time.Now(), candidateIPStr, netDef.ID)
-	} else {
-		// INSERT
-		_, err = tx.ExecContext(ctx,
-			"INSERT INTO ip_leases (ip, instance_name, allocated_at, network_id) VALUES ($1, $2, $3, $4)",
-			candidateIPStr, instanceName, time.Now(), netDef.ID)
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("failed to claim ip: %w", err)
-	}
-
-	return candidateIPStr, tx.Commit()
+	log.Printf("[IPAM-DEBUG] POOL_FULL after checking %d IPs", attemptCount)
+	return "", fmt.Errorf("POOL_FULL")
 }
 
 // ReleaseIP frees the IP assigned to an instance.
@@ -279,17 +267,158 @@ func (s *Service) GetInstanceIP(ctx context.Context, instanceName string) (strin
 	return ip, nil
 }
 
-// --- Helpers ---
+// --- Extended Types for Admin UI ---
 
-func ipToInt(ip net.IP) uint32 {
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
+type IpLease struct {
+	IP           string     `json:"ip_address"`
+	InstanceName *string    `json:"instance_name"`
+	AllocatedAt  *time.Time `json:"allocated_at"`
+	Status       string     `json:"status"` // "allocated" or "reserved"
 }
 
-func intToIP(nn uint32) net.IP {
+type NetworkDetails struct {
+	Network
+	Stats  NetworkStats `json:"stats"`
+	Leases []IpLease    `json:"leases"`
+}
+
+// GetNetworkDetails fetches a specific network with its usage stats and full lease list.
+func (s *Service) GetNetworkDetails(ctx context.Context, id string) (*NetworkDetails, error) {
+	// 1. Fetch Network
+	query := `SELECT id, name, cidr, gateway, dns1, vlan_id, is_public, created_at FROM networks WHERE id = $1`
+	var n Network
+	err := s.QueryRowContext(ctx, query, id).Scan(&n.ID, &n.Name, &n.CIDR, &n.Gateway, &n.DNS1, &n.VlanID, &n.IsPublic, &n.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	details := &NetworkDetails{
+		Network: n,
+		Leases:  []IpLease{},
+	}
+
+	// 2. Calculate Stats (Total/Used)
+	// (Reusing logic from GetNetworksWithStats basically, but for single ID)
+	_, ipNet, _ := net.ParseCIDR(n.CIDR)
+	if ipNet != nil {
+		ones, _ := ipNet.Mask.Size()
+		details.Stats.TotalIPs = 1 << (32 - ones)
+		if details.Stats.TotalIPs > 2 {
+			details.Stats.TotalIPs -= 3
+		}
+	}
+	details.Stats.Network = n // Copy base info
+
+	// 3. Fetch Leases
+	// We want ALL leases for this network
+	leasesQuery := `SELECT ip, instance_name, allocated_at FROM ip_leases WHERE network_id = $1 ORDER BY ip`
+	rows, err := s.QueryContext(ctx, leasesQuery, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	usedCount := 0
+	for rows.Next() {
+		var l IpLease
+		var instName sql.NullString
+		var allocAt sql.NullTime
+
+		if err := rows.Scan(&l.IP, &instName, &allocAt); err != nil {
+			return nil, err
+		}
+
+		if instName.Valid {
+			l.InstanceName = &instName.String
+			l.Status = "allocated"
+			usedCount++
+		} else {
+			l.Status = "reserved" // Pre-allocated but not assigned to VM
+		}
+
+		if allocAt.Valid {
+			l.AllocatedAt = &allocAt.Time
+		}
+
+		details.Leases = append(details.Leases, l)
+	}
+
+	details.Stats.UsedIPs = usedCount
+	if details.Stats.TotalIPs > 0 {
+		details.Stats.UsagePercent = (float64(usedCount) / float64(details.Stats.TotalIPs)) * 100
+	}
+
+	return details, nil
+}
+
+// DeleteNetwork removes a network pool. Fails if there are active allocations.
+func (s *Service) DeleteNetwork(ctx context.Context, id string) error {
+	// Check for active allocations
+	var count int
+	err := s.QueryRowContext(ctx, "SELECT COUNT(*) FROM ip_leases WHERE network_id = $1 AND instance_name IS NOT NULL", id).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("network has %d active IP allocations", count)
+	}
+
+	// Delete leases first (if cascading isn't set up or to be safe)
+	// Actually schema migration 8 didn't specify ON DELETE CASCADE explicitly for the foreign key,
+	// but usually we want to clean up.
+	// Migration 8: FOREIGN KEY (network_id) REFERENCES networks(id)
+	// Default is NO ACTION. So we MUST delete leases first.
+	_, err = s.ExecContext(ctx, "DELETE FROM ip_leases WHERE network_id = $1", id)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup leases: %w", err)
+	}
+
+	// Delete network
+	res, err := s.ExecContext(ctx, "DELETE FROM networks WHERE id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// --- Helpers ---
+
+func CidrToRange(cidr string) (uint32, uint32, error) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Forçar conversão para 4 bytes (IPv4)
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return 0, 0, fmt.Errorf("IPv6 not supported in this pool")
+	}
+
+	// Get mask size (e.g. 24 for /24)
+	ones, _ := ipnet.Mask.Size()
+
+	// Recreate clean 32-bit mask
+	mask := binary.BigEndian.Uint32(net.CIDRMask(ones, 32))
+	start := binary.BigEndian.Uint32(ip4)
+
+	// Calculate end by inverting mask
+	end := (start & mask) | (mask ^ 0xffffffff)
+
+	// DEBUG:
+	// log.Printf("[IPAM-DEBUG] CIDR=%s Start=%d End=%d Total=%d", cidr, start, end, end-start)
+
+	return start, end, nil
+}
+
+func IntToIP(nn uint32) string {
 	ip := make(net.IP, 4)
 	binary.BigEndian.PutUint32(ip, nn)
-	return ip
+	return ip.String()
 }

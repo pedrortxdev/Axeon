@@ -1,6 +1,7 @@
 package axhv
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -34,37 +35,27 @@ func MapCreateRequest(req types.Instance, ip string, gateway string) (*pb.Create
 	}
 
 	// Parse Ports
-	portMap := make(map[string]uint32)
+	portMap := make(map[uint32]uint32)
 	if val, ok := req.Limits["ports"]; ok {
-		// Input: "2202:22,8080:80"
+		// Input: "2202:22,8080:80" (hostPort:guestPort)
 		rules := strings.Split(val, ",")
 		for _, rule := range rules {
 			parts := strings.Split(rule, ":")
 			if len(parts) == 2 {
-				// Assuming format hostPort:guestPort
-				// The pb definition uses map<string, uint32> port_map_tcp = 6;
-				// Key is Host Port (string as per proto? Or maybe guest port?)
-				// Let's check proto definition. Usually map<string, uint32> is string key, int value.
-				// Wait, checking my previous view of proto...
-				// API.md says: `port_map_tcp` (map<string, uint32>) -> "80/tcp": 8080  (TargetPort:HostPort?)
-				// Actually AxHV v2 docs usually Map GuestPort -> HostPort or HostPort -> GuestPort?
-				// "Guest IP is internal". We map Host Port -> Guest Port.
-				// If Proto uses `map<string, uint32>`, key is usually string.
-				// Let's assume Key = Host Port (string), Value = Guest Port (uint32).
-				// Or Key = Guest Port (string/proto convention), Value = Host Port.
-				// Based on `mapper.go` usage in `applyFreeTierLimits` where it iterates `req.PortMapTcp`, it treats it as a map.
-
-				// Standard Container Mapping: Host:Container.
-				// Let's assume Key = HostPort (String), Value = GuestPort (UInt32).
-
-				hostPort := parts[0]
+				hostPort, _ := strconv.Atoi(parts[0])
 				guestPort, _ := strconv.Atoi(parts[1])
 
-				if guestPort > 0 {
-					portMap[hostPort] = uint32(guestPort)
+				if hostPort > 0 && guestPort > 0 {
+					portMap[uint32(hostPort)] = uint32(guestPort)
 				}
 			}
 		}
+	}
+
+	// Map Image to Paths
+	kernelPath, rootfsPath, err := mapImageToPaths(req.Image)
+	if err != nil {
+		return nil, err
 	}
 
 	pbReq := &pb.CreateVmRequest{
@@ -74,11 +65,9 @@ func MapCreateRequest(req types.Instance, ip string, gateway string) (*pb.Create
 		DiskSizeGb:   disk,
 		GuestIp:      ip,
 		GuestGateway: gateway,
-		// Assuming Template ID maps to R2 template or similar
-		// For now using RootfsPath generic if image looks like a path
-		// Or Template field if it's a known template name
-		Template:   req.Image,
-		PortMapTcp: portMap,
+		KernelPath:   kernelPath,
+		RootfsPath:   rootfsPath,
+		PortMapTcp:   portMap,
 	}
 
 	// Enforce Free Tier Limits (Hardcoded enforcement for now as requested)
@@ -88,6 +77,33 @@ func MapCreateRequest(req types.Instance, ip string, gateway string) (*pb.Create
 	applyFreeTierLimits(pbReq)
 
 	return pbReq, nil
+}
+
+func mapImageToPaths(imageName string) (string, string, error) {
+	// Base directories for AxHV
+	kernelDir := "/var/lib/axhv/kernels"
+	imagesDir := "/var/lib/axhv/images"
+
+	// Use the default kernel
+	kernelPath := fmt.Sprintf("%s/vmlinux-distro", kernelDir)
+
+	// Normalize image name and map to rootfs
+	switch {
+	case strings.Contains(imageName, "ubuntu"):
+		return kernelPath,
+			fmt.Sprintf("%s/ubuntu-rootfs.ext4", imagesDir),
+			nil
+	case strings.Contains(imageName, "alpine"):
+		// Alpine might use same kernel but different rootfs
+		return kernelPath,
+			fmt.Sprintf("%s/alpine-rootfs.ext4", imagesDir),
+			nil
+	default:
+		// Default to ubuntu
+		return kernelPath,
+			fmt.Sprintf("%s/ubuntu-rootfs.ext4", imagesDir),
+			nil
+	}
 }
 
 func applyFreeTierLimits(req *pb.CreateVmRequest) {
@@ -106,9 +122,7 @@ func applyFreeTierLimits(req *pb.CreateVmRequest) {
 	limitUdp := 1
 
 	if len(req.PortMapTcp) > limitTcp {
-		// Truncate logic or error? The requirement says "Maximo 3 portas".
-		// We will keep only the first N found (non-deterministic map iteration but enforces count)
-		newMap := make(map[string]uint32)
+		newMap := make(map[uint32]uint32)
 		i := 0
 		for k, v := range req.PortMapTcp {
 			if i >= limitTcp {
@@ -120,8 +134,8 @@ func applyFreeTierLimits(req *pb.CreateVmRequest) {
 		req.PortMapTcp = newMap
 	}
 
-	if len(req.PortMapTcp) > limitUdp {
-		newMap := make(map[string]uint32)
+	if len(req.PortMapUdp) > limitUdp {
+		newMap := make(map[uint32]uint32)
 		i := 0
 		for k, v := range req.PortMapUdp {
 			if i >= limitUdp {

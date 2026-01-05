@@ -149,6 +149,104 @@ export default function InstancesPage() {
     };
   }, [token]);
 
+  // --- HTTP Polling for Instances (Fallback when WebSocket not available) ---
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchInstances = async () => {
+      try {
+        const protocol = window.location.protocol;
+        const host = window.location.hostname;
+        const response = await fetch(`${protocol}//${host}:8500/api/v1/instances`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.status === 401) {
+          router.push('/login');
+          return;
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Fetch metrics for each running instance in parallel
+          const metricsPromises = data.map(async (inst: { name: string; status?: string; type?: string; ipAddress?: string; limits?: Record<string, string>;[key: string]: unknown }) => {
+            let cpuUsage = 0;
+            let memoryUsage = 0;
+            let netRx = 0;
+            let netTx = 0;
+            let diskUsage = 0;
+
+            // Fetch metrics only for running instances
+            if (inst.status === 'RUNNING') {
+              try {
+                const metricsRes = await fetch(`${protocol}//${host}:8500/api/v1/instances/${inst.name}/metrics`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (metricsRes.ok) {
+                  const metricsData = await metricsRes.json();
+                  // AxHV returns: cpu_usage_us, memory_used_bytes, net_rx_bytes, net_tx_bytes, disk_allocated_bytes
+                  // Values are uint64 numbers, not strings
+                  cpuUsage = (metricsData.cpu_usage_us || 0) / 1_000_000; // Convert to seconds
+                  memoryUsage = metricsData.memory_used_bytes || 0;
+                  netRx = metricsData.net_rx_bytes || 0;
+                  netTx = metricsData.net_tx_bytes || 0;
+                  diskUsage = metricsData.disk_allocated_bytes || 0;
+                }
+              } catch (e) {
+                console.warn(`Failed to fetch metrics for ${inst.name}:`, e);
+              }
+            }
+
+            return {
+              name: inst.name,
+              type: inst.type || 'virtual-machine',
+              status: inst.status || 'UNKNOWN',
+              memory_usage_bytes: memoryUsage,
+              cpu_usage_seconds: cpuUsage,
+              disk_usage_bytes: diskUsage,
+              network_rx_bytes: netRx,
+              network_tx_bytes: netTx,
+              config: inst.limits || {},
+              state: {
+                status: inst.status || 'UNKNOWN',
+                status_code: inst.status === 'RUNNING' ? 1 : 0,
+                network: {
+                  eth0: {
+                    addresses: inst.ipAddress ? [{ address: inst.ipAddress, family: 'inet', netmask: '24', scope: 'global' }] : [],
+                    counters: { bytes_received: netRx, bytes_sent: netTx, packets_received: 0, packets_sent: 0 },
+                    hwaddr: '',
+                    mtu: 1500,
+                    state: 'up',
+                    type: 'broadcast'
+                  }
+                },
+                memory: { usage: memoryUsage, usage_peak: 0, swap_usage: 0, swap_usage_peak: 0, total: 0 },
+                disk: {},
+                pid: 0,
+                processes: 0,
+                cpu: { usage: cpuUsage }
+              }
+            };
+          });
+
+          const metricsFormat = await Promise.all(metricsPromises);
+          setMetrics(metricsFormat);
+        }
+      } catch (err) {
+        console.error('Failed to fetch instances:', err);
+      }
+    };
+
+    // Initial fetch
+    fetchInstances();
+
+    // Poll every 10 seconds
+    const interval = setInterval(fetchInstances, 10000);
+
+    return () => clearInterval(interval);
+  }, [token, router]);
+
   const handlePowerAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
     if (!token) return;
     try {
