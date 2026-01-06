@@ -13,19 +13,20 @@ type InstanceBackupInfo struct {
 }
 
 type Instance struct {
-	Name            string              `json:"name"`
-	Image           string              `json:"image"`
-	Status          string              `json:"status"`    // RUNNING, STOPPED, etc. (from AxHV)
-	IpAddress       string              `json:"ipAddress"` // From ip_leases table
-	Limits          map[string]string   `json:"limits"`
-	UserData        string              `json:"user_data"`
-	Type            string              `json:"type"`
-	BackupSchedule  string              `json:"backup_schedule"`
-	BackupRetention int                 `json:"backup_retention"`
-	BackupEnabled   bool                `json:"backup_enabled"`
-	BackupInfo      *InstanceBackupInfo `json:"backup_info,omitempty"`
-	Node            string              `json:"node"`       // Ex: "pve-01" ou "lxd-node-1"
-	CPUCount        int                 `json:"cpu_count"`  // Quantidade de vCPUs
-	DiskUsage       int64               `json:"disk_usage"` // Bytes usados
-	DiskLimit       int64               `json:"disk_limit"` // Bytes totais (tamanho do disco)
+	Name               string              `json:"name"`
+	Image              string              `json:"image"`
+	Status             string              `json:"status"`    // RUNNING, STOPPED, etc. (from AxHV)
+	IpAddress          string              `json:"ipAddress"` // From ip_leases table
+	Limits             map[string]string   `json:"limits"`
+	UserData           string              `json:"user_data"`
+	Type               string              `json:"type"`
+	BackupSchedule     string              `json:"backup_schedule"`
+	BackupRetention    int                 `json:"backup_retention"`
+	BackupEnabled      bool                `json:"backup_enabled"`
+	BackupInfo         *InstanceBackupInfo `json:"backup_info,omitempty"`
+	Node               string              `json:"node"`                 // Ex: "pve-01" ou "lxd-node-1"
+	CPUCount           int                 `json:"cpu_count"`            // Quantidade de vCPUs
+	DiskUsage          int64               `json:"disk_usage"`           // Bytes usados
+	DiskLimit          int64               `json:"disk_limit"`           // Bytes totais (tamanho do disco)
+	BandwidthLimitMbps int                 `json:"bandwidth_limit_mbps"` // 0 = unlimited
 }

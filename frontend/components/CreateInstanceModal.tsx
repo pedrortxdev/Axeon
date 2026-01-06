@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Server, Box, Zap, FileCode, Code, Loader2, Monitor, User, Key, Network, FileUp } from 'lucide-react';
+import { X, Server, Box, Zap, FileCode, Code, Loader2, Monitor, User, Key, Network, FileUp, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { NetworkSelector } from './NetworkSelector';
 
@@ -89,6 +89,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
   const [isoImages, setIsoImages] = useState<IsoImage[]>([]);
   const [selectedIso, setSelectedIso] = useState<string>('');
   const [networkId, setNetworkId] = useState('');
+  const [bandwidth, setBandwidth] = useState(0); // 0 = Unlimited
 
   // Port Forwarding State
   const [ports, setPorts] = useState<{ ext: number; int: number }[]>([{ ext: 0, int: 22 }]);
@@ -118,6 +119,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
       setInstallMethod('template');
       setSelectedIso('');
       setNetworkId('');
+      setBandwidth(0); // Reset to unlimited
       setPorts([{ ext: 0, int: 22 }]); // Reset ports
     }
   }, [isOpen, initialType]);
@@ -315,9 +317,18 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
       let payload: any = {
         name: name.trim(),
         type: type,
+        image: image,
+        // Direct fields for AxHV
+        vcpu: cpu,
+        memory_mib: memory,
+        disk_size_gb: disk,
+        bandwidth_limit_mbps: bandwidth,
+        // Legacy limits format (for compatibility)
         limits: {
           "limits.cpu": cpu.toString(),
-          "limits.memory": `${memory}MB`
+          "limits.memory": `${memory}MB`,
+          "limits.disk": `${disk}GB`,
+          "bandwidth_limit_mbps": bandwidth.toString()
         },
         network_id: networkId,
       };
@@ -522,7 +533,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
                       <input
                         type="range"
                         min="1"
-                        max="8"
+                        max="32"
                         step="1"
                         value={cpu}
                         onChange={(e) => setCpu(parseInt(e.target.value))}
@@ -534,13 +545,13 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs text-zinc-400">Memory Limit</span>
-                        <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{memory} MB</span>
+                        <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{memory >= 1024 ? `${(memory / 1024).toFixed(1)} GB` : `${memory} MB`}</span>
                       </div>
                       <input
                         type="range"
                         min="256"
-                        max="8192"
-                        step="256"
+                        max="131072"
+                        step="512"
                         value={memory}
                         onChange={(e) => setMemory(parseInt(e.target.value))}
                         className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
@@ -557,14 +568,39 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
                         <input
                           type="range"
                           min="10"
-                          max="100"
-                          step="5"
+                          max="1000"
+                          step="10"
                           value={disk}
                           onChange={(e) => setDisk(parseInt(e.target.value))}
                           className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
                         />
                       </div>
                     )}
+
+                    {/* Bandwidth Limit */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs text-zinc-400 flex items-center gap-1.5">
+                          <Wifi size={12} /> Network Speed
+                        </span>
+                        <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                          {bandwidth === 0 ? '∞ Unlimited' : `${bandwidth} Mbps`}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="10"
+                        value={bandwidth}
+                        onChange={(e) => setBandwidth(parseInt(e.target.value))}
+                        className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
+                        <span>Unlimited</span>
+                        <span>100 Mbps</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -639,7 +675,7 @@ export default function CreateInstanceModal({ isOpen, onClose, token, initialTyp
                       <Zap size={14} className="mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="font-semibold">Free Tier Plan</p>
-                        <p className="opacity-80">Limits: 10Mbps Bandwidth, Max 3 Port Mapping Rules.</p>
+                        <p className="opacity-80">Max 3 Port Mapping Rules. Configure bandwidth in Resources above.</p>
                       </div>
                     </div>
 

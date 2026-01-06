@@ -66,6 +66,9 @@ message CreateVmRequest {
   uint32 bandwidth_limit_mbps = 14;  // Rate limit (0 = unlimited, e.g., 10 for 10Mbps)
   map<uint32, uint32> port_map_tcp = 15;  // TCP port forwarding: host_port -> guest_port
   map<uint32, uint32> port_map_udp = 16;  // UDP port forwarding: host_port -> guest_port
+  
+  // Root password injection (injected via mount+chpasswd before boot)
+  string root_password = 17;
 }
 
 // Disk Resize

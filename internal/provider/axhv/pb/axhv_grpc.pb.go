@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.33.1
-// source: axhv.proto
+// source: proto/axhv.proto
 
 package pb
 
@@ -503,5 +503,5 @@ var VmService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "axhv.proto",
+	Metadata: "proto/axhv.proto",
 }

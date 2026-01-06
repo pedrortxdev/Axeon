@@ -145,8 +145,8 @@ type InstanceActionRequest struct {
 }
 
 type InstanceLimitsRequest struct {
-	Memory string `json:"memory"`
-	CPU    string `json:"cpu"`
+	VCPU      int `json:"vcpu"`
+	MemoryMiB int `json:"memory_mib"`
 }
 
 type CreateInstanceRequest struct {
@@ -158,6 +158,12 @@ type CreateInstanceRequest struct {
 	TemplateID string            `json:"template_id"`
 	ISOImage   string            `json:"iso_image"`
 	NetworkID  string            `json:"network_id"`
+	Password   string            `json:"password"` // Root password for VM
+	// Direct resource fields (preferred over parsing from Limits)
+	VCPU               int `json:"vcpu"`
+	MemoryMiB          int `json:"memory_mib"`
+	DiskSizeGB         int `json:"disk_size_gb"`
+	BandwidthLimitMbps int `json:"bandwidth_limit_mbps"`
 }
 
 type SnapshotRequest struct {
@@ -338,6 +344,13 @@ func (h *Handlers) GetInstance(c *gin.Context) {
 		instance.DiskLimit = parseSizeToBytes(val)
 	}
 
+	// Bandwidth limit parsing (0 = unlimited)
+	if val, ok := instance.Limits["bandwidth_limit_mbps"]; ok {
+		if bw, err := strconv.Atoi(val); err == nil {
+			instance.BandwidthLimitMbps = bw
+		}
+	}
+
 	// Ensure IP is set (fetched from DB join now)
 	// Gateway is hardcoded for MVP
 	// We can inject "guest_gateway" into limits or a specific field if needed,
@@ -437,7 +450,7 @@ func (h *Handlers) CreateInstance(c *gin.Context) {
 		}
 	}()
 
-	// Create Instance object for Mapping
+	// Create Instance object for DB storage
 	instance := types.Instance{
 		Name:            req.Name,
 		Image:           req.Image,
@@ -449,9 +462,28 @@ func (h *Handlers) CreateInstance(c *gin.Context) {
 		BackupEnabled:   false,
 	}
 
-	// Map to Protobuf
+	// Map to Protobuf - use V2 if direct values provided, else legacy
 	gateway := "172.16.0.1" // Gateway is constant for now
-	pbReq, err := axhv.MapCreateRequest(instance, ip, gateway)
+	var pbReq *pb.CreateVmRequest
+
+	if req.VCPU > 0 || req.MemoryMiB > 0 || req.DiskSizeGB > 0 {
+		// Use direct values from frontend
+		pbReq, err = axhv.MapCreateRequestV2(
+			req.Name,
+			req.Image,
+			req.VCPU,
+			req.MemoryMiB,
+			req.DiskSizeGB,
+			req.BandwidthLimitMbps,
+			ip,
+			gateway,
+			req.Limits,
+			req.Password,
+		)
+	} else {
+		// Legacy: parse from limits strings
+		pbReq, err = axhv.MapCreateRequest(instance, ip, gateway)
+	}
 	if err != nil {
 		h.writeError(c, NewError(ErrCodeInstanceCreationFailed, "failed to map request", err, 400, false))
 		return
@@ -474,11 +506,12 @@ func (h *Handlers) CreateInstance(c *gin.Context) {
 	// Persist to DB
 	// Note: We already allocated the IP which updated the ip_leases table with instance_name.
 	// We should also insert into instances table as before.
-	// Update limits with the allocated IP to keep consistency if needed by other parts
+	// Update limits with the allocated IP and bandwidth to keep consistency
 	if instance.Limits == nil {
 		instance.Limits = make(map[string]string)
 	}
 	instance.Limits["volatile.ip_address"] = ip
+	instance.Limits["bandwidth_limit_mbps"] = strconv.Itoa(int(pbReq.BandwidthLimitMbps))
 
 	if err := db.CreateInstance(&instance); err != nil {
 		// If DB fails, we should try to cleanup the VM? Ideally yes.
@@ -566,8 +599,54 @@ func (h *Handlers) UpdateInstanceState(c *gin.Context) {
 }
 
 func (h *Handlers) UpdateInstanceLimits(c *gin.Context) {
-	// Stub success
-	c.JSON(200, gin.H{"status": "accepted (db only)"})
+	name := c.Param("name")
+	var req InstanceLimitsRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.writeError(c, ErrInvalidJSON(err))
+		return
+	}
+
+	// Validate at least one field is provided
+	if req.VCPU <= 0 && req.MemoryMiB <= 0 {
+		h.writeError(c, NewError(ErrCodeMissingField, "at least vcpu or memory_mib required", nil, 400, false))
+		return
+	}
+
+	// Get current instance from DB
+	instance, err := db.GetInstance(name)
+	if err != nil {
+		h.writeError(c, ErrInstanceNotFound(name))
+		return
+	}
+
+	// Update limits map
+	if instance.Limits == nil {
+		instance.Limits = make(map[string]string)
+	}
+	if req.VCPU > 0 {
+		instance.Limits["limits.cpu"] = strconv.Itoa(req.VCPU)
+	}
+	if req.MemoryMiB > 0 {
+		instance.Limits["limits.memory"] = fmt.Sprintf("%dMB", req.MemoryMiB)
+	}
+
+	// Save to DB
+	if err := db.UpdateInstanceStatusAndLimits(name, instance.Limits); err != nil {
+		h.writeError(c, ErrDatabaseFailure(err))
+		return
+	}
+
+	// Note: Hot-resize via AxHV is not yet implemented
+	// Changes will take effect on next VM restart
+	c.JSON(200, gin.H{
+		"status":  "updated",
+		"message": "Limits updated. Changes will take effect on next restart.",
+		"limits": gin.H{
+			"vcpu":       req.VCPU,
+			"memory_mib": req.MemoryMiB,
+		},
+	})
 }
 
 func (h *Handlers) UpdateBackupConfig(c *gin.Context) {

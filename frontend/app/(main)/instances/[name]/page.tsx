@@ -13,7 +13,8 @@ import {
     Network,
     Copy,
     ChevronLeft,
-    Server
+    Server,
+    Infinity
 } from 'lucide-react';
 import Link from 'next/link';
 import { useInstanceControl } from '@/hooks/useInstanceControl';
@@ -52,11 +53,12 @@ export default function InstanceDetails() {
                         ...data,
                         // Parse memory from limits if available, e.g. "512MB" -> 512
                         memory_mib: parseMemory(data.limits?.['limits.memory'] || data.limits?.['memory'] || '512MB'),
-                        // Disk comes as bytes in disk_limit, convert to GB
-                        disk_size_gb: (data.disk_limit || 0) / (1024 * 1024 * 1024),
+                        // Parse disk from limits ("10GB" -> 10) or use default
+                        disk_size_gb: parseDiskSize(data.limits?.['limits.disk'] || data.limits?.['disk'] || '10GB'),
                         // Default gateway for MVP
                         guest_gateway: '172.16.0.1',
-                        bandwidth_limit_mbps: 100 // Hardcoded for MVP free tier
+                        // Bandwidth from API (0 = unlimited)
+                        bandwidth_limit_mbps: data.bandwidth_limit_mbps ?? 0
                     });
                 } else {
                     if (response.status === 404) toast.error("Instance not found");
@@ -79,6 +81,15 @@ export default function InstanceDetails() {
         if (m.endsWith('MB')) return parseInt(m);
         if (m.endsWith('GB')) return parseInt(m) * 1024;
         return parseInt(m);
+    }
+
+    // Helper to parse disk size string (e.g. "10GB" -> 10)
+    const parseDiskSize = (disk: string) => {
+        if (!disk) return 10;
+        const d = disk.toUpperCase();
+        if (d.endsWith('GB')) return parseInt(d);
+        if (d.endsWith('TB')) return parseInt(d) * 1024;
+        return parseInt(d) || 10;
     }
 
     if (loading) return (
@@ -171,98 +182,86 @@ export default function InstanceDetails() {
                     </div>
                 </div>
 
-                {/* 2. Connectivity Area */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* SSH Card */}
-                    <div className="lg:col-span-2 bg-zinc-900/30 p-8 rounded-2xl border border-zinc-800/50 flex flex-col justify-center">
-                        <div className="flex items-center mb-6 text-indigo-400">
-                            <Terminal className="w-6 h-6 mr-3" />
-                            <h2 className="text-xl font-bold tracking-tight text-zinc-100">Access via SSH</h2>
-                        </div>
-
-                        <div className="bg-black/50 p-5 rounded-xl border border-zinc-800 flex justify-between items-center group hover:border-zinc-700 transition-colors">
-                            <code className="text-emerald-400 font-mono text-sm md:text-base">
-                                ssh root@{instance.ipAddress || 'Checking...'}
-                            </code>
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(`ssh root@${instance.ipAddress}`);
-                                    toast.success("SSH command copied to clipboard");
-                                }}
-                                className="text-zinc-500 hover:text-zinc-200 transition-colors p-2"
-                            >
-                                <Copy size={18} />
-                            </button>
-                        </div>
-                        <p className="text-xs text-zinc-500 mt-4 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                            Internal IP address. Configure VPN or Port Forwarding for external access.
-                        </p>
+                {/* Compact SSH Bar */}
+                <div className="bg-zinc-900/50 px-4 py-3 rounded-xl border border-zinc-800/50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Terminal className="w-4 h-4 text-indigo-400" />
+                        <code className="text-emerald-400 font-mono text-sm">ssh root@{instance.ipAddress || 'N/A'}</code>
                     </div>
-
-                    {/* Network Summary */}
-                    <div className="bg-zinc-900/30 p-8 rounded-2xl border border-zinc-800/50">
-                        <div className="flex items-center mb-6 text-purple-400">
-                            <Network className="w-6 h-6 mr-3" />
-                            <h2 className="text-xl font-bold tracking-tight text-zinc-100">Network</h2>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3">
-                                <span className="text-zinc-500 text-sm font-medium">Internal IP</span>
-                                <span className="text-zinc-200 font-mono text-sm">{instance.ipAddress || 'N/A'}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3">
-                                <span className="text-zinc-500 text-sm font-medium">Gateway</span>
-                                <span className="text-zinc-200 font-mono text-sm">{instance.guest_gateway}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-zinc-500 text-sm font-medium">Speed Limit</span>
-                                <span className="text-amber-400 font-mono text-sm font-bold">{instance.bandwidth_limit_mbps} Mbps</span>
-                            </div>
-                        </div>
-                    </div>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(`ssh root@${instance.ipAddress}`);
+                            toast.success("Copied!");
+                        }}
+                        className="text-zinc-500 hover:text-zinc-200 transition-colors p-1.5 hover:bg-zinc-800 rounded-lg"
+                        title="Copy SSH command"
+                    >
+                        <Copy size={16} />
+                    </button>
                 </div>
 
-                {/* 3. Allocated Resources Cards */}
-                <div>
-                    <h2 className="text-lg font-semibold text-zinc-400 mb-4 px-1">Allocated Resources <span className="text-xs font-normal text-zinc-600 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 ml-2">FREE TIER</span></h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 2. Resources Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-                        {/* vCPU */}
-                        <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50 flex items-center hover:bg-zinc-900/50 transition-colors">
-                            <div className="bg-blue-500/10 p-4 rounded-xl mr-5 border border-blue-500/10">
-                                <Cpu className="w-8 h-8 text-blue-400" strokeWidth={1.5} />
+                    {/* Network Summary */}
+                    <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50">
+                        <div className="flex items-center mb-4 text-purple-400">
+                            <Network className="w-5 h-5 mr-2" />
+                            <h2 className="text-base font-bold text-zinc-100">Network</h2>
+                        </div>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-500">IP</span>
+                                <span className="text-zinc-200 font-mono">{instance.ipAddress || 'N/A'}</span>
                             </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Processor</p>
-                                <p className="text-3xl font-bold text-zinc-100 tracking-tight">{instance.cpu_count || 1} <span className="text-base font-medium text-zinc-500">vCore</span></p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-500">Gateway</span>
+                                <span className="text-zinc-200 font-mono">{instance.guest_gateway}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-500">Speed</span>
+                                {instance.bandwidth_limit_mbps > 0 ? (
+                                    <span className="text-amber-400 font-mono font-bold">{instance.bandwidth_limit_mbps} Mbps</span>
+                                ) : (
+                                    <span className="text-emerald-400 font-mono font-bold flex items-center gap-1"><Infinity size={14} /> Unlimited</span>
+                                )}
                             </div>
                         </div>
-
-                        {/* RAM */}
-                        <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50 flex items-center hover:bg-zinc-900/50 transition-colors">
-                            <div className="bg-purple-500/10 p-4 rounded-xl mr-5 border border-purple-500/10">
-                                <Server className="w-8 h-8 text-purple-400" strokeWidth={1.5} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Memory</p>
-                                <p className="text-3xl font-bold text-zinc-100 tracking-tight">{instance.memory_mib} <span className="text-base font-medium text-zinc-500">MB</span></p>
-                            </div>
-                        </div>
-
-                        {/* DISK */}
-                        <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50 flex items-center hover:bg-zinc-900/50 transition-colors">
-                            <div className="bg-amber-500/10 p-4 rounded-xl mr-5 border border-amber-500/10">
-                                <HardDrive className="w-8 h-8 text-amber-400" strokeWidth={1.5} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Storage</p>
-                                <p className="text-3xl font-bold text-zinc-100 tracking-tight">{Math.round(instance.disk_size_gb)} <span className="text-base font-medium text-zinc-500">GB</span></p>
-                            </div>
-                        </div>
-
                     </div>
+
+                    {/* vCPU */}
+                    <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50 flex items-center hover:bg-zinc-900/50 transition-colors">
+                        <div className="bg-blue-500/10 p-3 rounded-xl mr-4 border border-blue-500/10">
+                            <Cpu className="w-6 h-6 text-blue-400" strokeWidth={1.5} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider">CPU</p>
+                            <p className="text-2xl font-bold text-zinc-100">{instance.cpu_count || 1} <span className="text-sm font-medium text-zinc-500">vCore</span></p>
+                        </div>
+                    </div>
+
+                    {/* RAM */}
+                    <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50 flex items-center hover:bg-zinc-900/50 transition-colors">
+                        <div className="bg-purple-500/10 p-3 rounded-xl mr-4 border border-purple-500/10">
+                            <Server className="w-6 h-6 text-purple-400" strokeWidth={1.5} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider">RAM</p>
+                            <p className="text-2xl font-bold text-zinc-100">{instance.memory_mib} <span className="text-sm font-medium text-zinc-500">MB</span></p>
+                        </div>
+                    </div>
+
+                    {/* DISK */}
+                    <div className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/50 flex items-center hover:bg-zinc-900/50 transition-colors">
+                        <div className="bg-amber-500/10 p-3 rounded-xl mr-4 border border-amber-500/10">
+                            <HardDrive className="w-6 h-6 text-amber-400" strokeWidth={1.5} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Disk</p>
+                            <p className="text-2xl font-bold text-zinc-100">{Math.round(instance.disk_size_gb)} <span className="text-sm font-medium text-zinc-500">GB</span></p>
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* Footer */}

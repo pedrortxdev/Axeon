@@ -10,6 +10,65 @@ import (
 	"aexon/internal/utils"
 )
 
+// MapCreateRequestV2 maps values directly without parsing from strings.
+// This is the preferred method when the frontend sends numeric values.
+func MapCreateRequestV2(name string, image string, vcpu int, memoryMiB int, diskGB int, bandwidthMbps int, ip string, gateway string, ports map[string]string, password string) (*pb.CreateVmRequest, error) {
+	// Apply defaults
+	if vcpu <= 0 {
+		vcpu = 1
+	}
+	if memoryMiB <= 0 {
+		memoryMiB = 512
+	}
+	if diskGB <= 0 {
+		diskGB = 10
+	}
+
+	// Default password if not provided
+	if password == "" {
+		password = "root"
+	}
+
+	// Map Image to Paths
+	kernelPath, rootfsPath, err := mapImageToPaths(image)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse Ports from limits map
+	portMap := make(map[uint32]uint32)
+	if portsStr, ok := ports["ports"]; ok {
+		rules := strings.Split(portsStr, ",")
+		for _, rule := range rules {
+			parts := strings.Split(rule, ":")
+			if len(parts) == 2 {
+				hostPort, _ := strconv.Atoi(parts[0])
+				guestPort, _ := strconv.Atoi(parts[1])
+				if hostPort > 0 && guestPort > 0 {
+					portMap[uint32(hostPort)] = uint32(guestPort)
+				}
+			}
+		}
+	}
+
+	pbReq := &pb.CreateVmRequest{
+		Id:                 name,
+		Vcpu:               uint32(vcpu),
+		MemoryMib:          uint32(memoryMiB),
+		DiskSizeGb:         uint32(diskGB),
+		BandwidthLimitMbps: uint32(bandwidthMbps),
+		GuestIp:            ip,
+		GuestGateway:       gateway,
+		KernelPath:         kernelPath,
+		RootfsPath:         rootfsPath,
+		PortMapTcp:         portMap,
+		RootPassword:       password,
+	}
+
+	// Note: Free tier limits are NOT applied here - caller can enforce if needed
+	return pbReq, nil
+}
+
 // MapCreateRequest maps the internal CreateInstanceRequest to the protobuf CreateVmRequest.
 // It also enforces Free Tier limitations.
 func MapCreateRequest(req types.Instance, ip string, gateway string) (*pb.CreateVmRequest, error) {
@@ -107,8 +166,8 @@ func mapImageToPaths(imageName string) (string, string, error) {
 }
 
 func applyFreeTierLimits(req *pb.CreateVmRequest) {
-	// 1. Bandwidth Limit 10Mbps
-	req.BandwidthLimitMbps = 10
+	// Bandwidth: 0 = unlimited (no traffic shaping)
+	// Removed: req.BandwidthLimitMbps = 10
 
 	// 2. Port Limits
 	// As we don't have ports in the generic input yet (usually added later),

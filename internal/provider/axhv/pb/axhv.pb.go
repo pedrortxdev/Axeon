@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.1
-// source: axhv.proto
+// source: proto/axhv.proto
 
 package pb
 
@@ -30,7 +30,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_axhv_proto_msgTypes[0]
+	mi := &file_proto_axhv_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +42,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[0]
+	mi := &file_proto_axhv_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +55,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{0}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{0}
 }
 
 type VmIdRequest struct {
@@ -67,7 +67,7 @@ type VmIdRequest struct {
 
 func (x *VmIdRequest) Reset() {
 	*x = VmIdRequest{}
-	mi := &file_axhv_proto_msgTypes[1]
+	mi := &file_proto_axhv_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -79,7 +79,7 @@ func (x *VmIdRequest) String() string {
 func (*VmIdRequest) ProtoMessage() {}
 
 func (x *VmIdRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[1]
+	mi := &file_proto_axhv_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -92,7 +92,7 @@ func (x *VmIdRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmIdRequest.ProtoReflect.Descriptor instead.
 func (*VmIdRequest) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{1}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *VmIdRequest) GetId() string {
@@ -112,7 +112,7 @@ type GetVmStatsRequest struct {
 
 func (x *GetVmStatsRequest) Reset() {
 	*x = GetVmStatsRequest{}
-	mi := &file_axhv_proto_msgTypes[2]
+	mi := &file_proto_axhv_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -124,7 +124,7 @@ func (x *GetVmStatsRequest) String() string {
 func (*GetVmStatsRequest) ProtoMessage() {}
 
 func (x *GetVmStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[2]
+	mi := &file_proto_axhv_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -137,7 +137,7 @@ func (x *GetVmStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVmStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetVmStatsRequest) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{2}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetVmStatsRequest) GetId() string {
@@ -165,7 +165,7 @@ type VmResponse struct {
 
 func (x *VmResponse) Reset() {
 	*x = VmResponse{}
-	mi := &file_axhv_proto_msgTypes[3]
+	mi := &file_proto_axhv_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -177,7 +177,7 @@ func (x *VmResponse) String() string {
 func (*VmResponse) ProtoMessage() {}
 
 func (x *VmResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[3]
+	mi := &file_proto_axhv_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -190,7 +190,7 @@ func (x *VmResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmResponse.ProtoReflect.Descriptor instead.
 func (*VmResponse) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{3}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *VmResponse) GetSuccess() bool {
@@ -235,13 +235,15 @@ type CreateVmRequest struct {
 	BandwidthLimitMbps uint32            `protobuf:"varint,14,opt,name=bandwidth_limit_mbps,json=bandwidthLimitMbps,proto3" json:"bandwidth_limit_mbps,omitempty"`                                                    // Rate limit (0 = unlimited, e.g., 10 for 10Mbps)
 	PortMapTcp         map[uint32]uint32 `protobuf:"bytes,15,rep,name=port_map_tcp,json=portMapTcp,proto3" json:"port_map_tcp,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // TCP port forwarding: host_port -> guest_port
 	PortMapUdp         map[uint32]uint32 `protobuf:"bytes,16,rep,name=port_map_udp,json=portMapUdp,proto3" json:"port_map_udp,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // UDP port forwarding: host_port -> guest_port
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Root password injection (injected via mount+chpasswd before boot)
+	RootPassword  string `protobuf:"bytes,17,opt,name=root_password,json=rootPassword,proto3" json:"root_password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateVmRequest) Reset() {
 	*x = CreateVmRequest{}
-	mi := &file_axhv_proto_msgTypes[4]
+	mi := &file_proto_axhv_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -253,7 +255,7 @@ func (x *CreateVmRequest) String() string {
 func (*CreateVmRequest) ProtoMessage() {}
 
 func (x *CreateVmRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[4]
+	mi := &file_proto_axhv_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -266,7 +268,7 @@ func (x *CreateVmRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVmRequest.ProtoReflect.Descriptor instead.
 func (*CreateVmRequest) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{4}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateVmRequest) GetId() string {
@@ -360,6 +362,13 @@ func (x *CreateVmRequest) GetPortMapUdp() map[uint32]uint32 {
 	return nil
 }
 
+func (x *CreateVmRequest) GetRootPassword() string {
+	if x != nil {
+		return x.RootPassword
+	}
+	return ""
+}
+
 // Disk Resize
 type ResizeDiskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -371,7 +380,7 @@ type ResizeDiskRequest struct {
 
 func (x *ResizeDiskRequest) Reset() {
 	*x = ResizeDiskRequest{}
-	mi := &file_axhv_proto_msgTypes[5]
+	mi := &file_proto_axhv_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -383,7 +392,7 @@ func (x *ResizeDiskRequest) String() string {
 func (*ResizeDiskRequest) ProtoMessage() {}
 
 func (x *ResizeDiskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[5]
+	mi := &file_proto_axhv_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -396,7 +405,7 @@ func (x *ResizeDiskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeDiskRequest.ProtoReflect.Descriptor instead.
 func (*ResizeDiskRequest) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{5}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ResizeDiskRequest) GetId() string {
@@ -423,7 +432,7 @@ type ListVmsResponse struct {
 
 func (x *ListVmsResponse) Reset() {
 	*x = ListVmsResponse{}
-	mi := &file_axhv_proto_msgTypes[6]
+	mi := &file_proto_axhv_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -435,7 +444,7 @@ func (x *ListVmsResponse) String() string {
 func (*ListVmsResponse) ProtoMessage() {}
 
 func (x *ListVmsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[6]
+	mi := &file_proto_axhv_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -448,7 +457,7 @@ func (x *ListVmsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVmsResponse.ProtoReflect.Descriptor instead.
 func (*ListVmsResponse) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{6}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListVmsResponse) GetVms() []*VmInfo {
@@ -469,7 +478,7 @@ type VmInfo struct {
 
 func (x *VmInfo) Reset() {
 	*x = VmInfo{}
-	mi := &file_axhv_proto_msgTypes[7]
+	mi := &file_proto_axhv_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +490,7 @@ func (x *VmInfo) String() string {
 func (*VmInfo) ProtoMessage() {}
 
 func (x *VmInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[7]
+	mi := &file_proto_axhv_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +503,7 @@ func (x *VmInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmInfo.ProtoReflect.Descriptor instead.
 func (*VmInfo) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{7}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *VmInfo) GetId() string {
@@ -532,7 +541,7 @@ type VmStatsResponse struct {
 
 func (x *VmStatsResponse) Reset() {
 	*x = VmStatsResponse{}
-	mi := &file_axhv_proto_msgTypes[8]
+	mi := &file_proto_axhv_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -544,7 +553,7 @@ func (x *VmStatsResponse) String() string {
 func (*VmStatsResponse) ProtoMessage() {}
 
 func (x *VmStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[8]
+	mi := &file_proto_axhv_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -557,7 +566,7 @@ func (x *VmStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VmStatsResponse.ProtoReflect.Descriptor instead.
 func (*VmStatsResponse) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{8}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *VmStatsResponse) GetCpuUsageUs() uint64 {
@@ -607,7 +616,7 @@ type HostStatsResponse struct {
 
 func (x *HostStatsResponse) Reset() {
 	*x = HostStatsResponse{}
-	mi := &file_axhv_proto_msgTypes[9]
+	mi := &file_proto_axhv_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -619,7 +628,7 @@ func (x *HostStatsResponse) String() string {
 func (*HostStatsResponse) ProtoMessage() {}
 
 func (x *HostStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_axhv_proto_msgTypes[9]
+	mi := &file_proto_axhv_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -632,7 +641,7 @@ func (x *HostStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostStatsResponse.ProtoReflect.Descriptor instead.
 func (*HostStatsResponse) Descriptor() ([]byte, []int) {
-	return file_axhv_proto_rawDescGZIP(), []int{9}
+	return file_proto_axhv_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *HostStatsResponse) GetDiskTotalMib() uint64 {
@@ -663,12 +672,11 @@ func (x *HostStatsResponse) GetVmCount() uint32 {
 	return 0
 }
 
-var File_axhv_proto protoreflect.FileDescriptor
+var File_proto_axhv_proto protoreflect.FileDescriptor
 
-const file_axhv_proto_rawDesc = "" +
+const file_proto_axhv_proto_rawDesc = "" +
 	"\n" +
-	"\n" +
-	"axhv.proto\x12\x04axhv\"\a\n" +
+	"\x10proto/axhv.proto\x12\x04axhv\"\a\n" +
 	"\x05Empty\"\x1d\n" +
 	"\vVmIdRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\">\n" +
@@ -679,7 +687,7 @@ const file_axhv_proto_rawDesc = "" +
 	"VmResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x13\n" +
-	"\x05vm_id\x18\x03 \x01(\tR\x04vmId\"\xf3\x04\n" +
+	"\x05vm_id\x18\x03 \x01(\tR\x04vmId\"\x98\x05\n" +
 	"\x0fCreateVmRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04vcpu\x18\x02 \x01(\rR\x04vcpu\x12\x1d\n" +
@@ -700,7 +708,8 @@ const file_axhv_proto_rawDesc = "" +
 	"\fport_map_tcp\x18\x0f \x03(\v2%.axhv.CreateVmRequest.PortMapTcpEntryR\n" +
 	"portMapTcp\x12G\n" +
 	"\fport_map_udp\x18\x10 \x03(\v2%.axhv.CreateVmRequest.PortMapUdpEntryR\n" +
-	"portMapUdp\x1a=\n" +
+	"portMapUdp\x12#\n" +
+	"\rroot_password\x18\x11 \x01(\tR\frootPassword\x1a=\n" +
 	"\x0fPortMapTcpEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\rR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\x1a=\n" +
@@ -747,19 +756,19 @@ const file_axhv_proto_rawDesc = "" +
 	"\fGetHostStats\x12\v.axhv.Empty\x1a\x17.axhv.HostStatsResponseB!Z\x1faexon/internal/provider/axhv/pbb\x06proto3"
 
 var (
-	file_axhv_proto_rawDescOnce sync.Once
-	file_axhv_proto_rawDescData []byte
+	file_proto_axhv_proto_rawDescOnce sync.Once
+	file_proto_axhv_proto_rawDescData []byte
 )
 
-func file_axhv_proto_rawDescGZIP() []byte {
-	file_axhv_proto_rawDescOnce.Do(func() {
-		file_axhv_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_axhv_proto_rawDesc), len(file_axhv_proto_rawDesc)))
+func file_proto_axhv_proto_rawDescGZIP() []byte {
+	file_proto_axhv_proto_rawDescOnce.Do(func() {
+		file_proto_axhv_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_axhv_proto_rawDesc), len(file_proto_axhv_proto_rawDesc)))
 	})
-	return file_axhv_proto_rawDescData
+	return file_proto_axhv_proto_rawDescData
 }
 
-var file_axhv_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
-var file_axhv_proto_goTypes = []any{
+var file_proto_axhv_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_proto_axhv_proto_goTypes = []any{
 	(*Empty)(nil),             // 0: axhv.Empty
 	(*VmIdRequest)(nil),       // 1: axhv.VmIdRequest
 	(*GetVmStatsRequest)(nil), // 2: axhv.GetVmStatsRequest
@@ -773,7 +782,7 @@ var file_axhv_proto_goTypes = []any{
 	nil,                       // 10: axhv.CreateVmRequest.PortMapTcpEntry
 	nil,                       // 11: axhv.CreateVmRequest.PortMapUdpEntry
 }
-var file_axhv_proto_depIdxs = []int32{
+var file_proto_axhv_proto_depIdxs = []int32{
 	10, // 0: axhv.CreateVmRequest.port_map_tcp:type_name -> axhv.CreateVmRequest.PortMapTcpEntry
 	11, // 1: axhv.CreateVmRequest.port_map_udp:type_name -> axhv.CreateVmRequest.PortMapUdpEntry
 	7,  // 2: axhv.ListVmsResponse.vms:type_name -> axhv.VmInfo
@@ -806,26 +815,26 @@ var file_axhv_proto_depIdxs = []int32{
 	0,  // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_axhv_proto_init() }
-func file_axhv_proto_init() {
-	if File_axhv_proto != nil {
+func init() { file_proto_axhv_proto_init() }
+func file_proto_axhv_proto_init() {
+	if File_proto_axhv_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_axhv_proto_rawDesc), len(file_axhv_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_axhv_proto_rawDesc), len(file_proto_axhv_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_axhv_proto_goTypes,
-		DependencyIndexes: file_axhv_proto_depIdxs,
-		MessageInfos:      file_axhv_proto_msgTypes,
+		GoTypes:           file_proto_axhv_proto_goTypes,
+		DependencyIndexes: file_proto_axhv_proto_depIdxs,
+		MessageInfos:      file_proto_axhv_proto_msgTypes,
 	}.Build()
-	File_axhv_proto = out.File
-	file_axhv_proto_goTypes = nil
-	file_axhv_proto_depIdxs = nil
+	File_proto_axhv_proto = out.File
+	file_proto_axhv_proto_goTypes = nil
+	file_proto_axhv_proto_depIdxs = nil
 }
